@@ -1,0 +1,3331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Firebase (free Spark plan) for cross-device sync -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GatherCart — Group Ordering, Together</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --brand: #F97316; --brand-dark: #EA580C; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #F8FAFC; color: #0F172A; }
+    .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .brand-gradient { background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); }
+    .brand-gradient-soft { background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%); }
+    .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 20px; }
+    .btn-brand { background: linear-gradient(135deg, #F97316, #EA580C); color: #fff; font-weight: 700; border-radius: 12px; transition: opacity .15s, transform .1s; }
+    .btn-brand:hover { opacity: .92; transform: translateY(-1px); }
+    .btn-brand:active { transform: translateY(0); }
+    .btn-ghost { background: #F1F5F9; color: #475569; font-weight: 600; border-radius: 12px; transition: background .15s; }
+    .btn-ghost:hover { background: #E2E8F0; }
+    .btn-danger { background: #FEF2F2; color: #DC2626; font-weight: 700; border-radius: 12px; transition: background .15s; }
+    .btn-danger:hover { background: #FEE2E2; }
+    input, textarea, select { outline: none; transition: border-color .15s, box-shadow .15s; }
+    input:focus, textarea:focus, select:focus { border-color: #F97316 !important; box-shadow: 0 0 0 3px rgba(249,115,22,.12); }
+    .tab-active { background: linear-gradient(135deg, #F97316, #EA580C); color: #fff !important; }
+    .pill-active { background: #F97316; color: #fff; }
+    .menu-item-card { transition: box-shadow .15s, transform .15s; }
+    .menu-item-card:hover { box-shadow: 0 4px 16px rgba(249,115,22,.12); transform: translateY(-1px); }
+    .restaurant-card { transition: box-shadow .15s, border-color .15s, transform .15s; cursor: pointer; }
+    .restaurant-card:hover { box-shadow: 0 4px 16px rgba(249,115,22,.14); transform: translateY(-1px); }
+    .restaurant-card.selected { border-color: #F97316 !important; box-shadow: 0 0 0 2px rgba(249,115,22,.25); }
+    .cart-item-row { transition: background .12s; }
+    .cart-item-row:hover { background: #FFF7ED; }
+    .qty-btn { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; transition: background .12s; }
+    .qty-btn:hover { background: #FFEDD5; color: #EA580C; }
+    /* Toast */
+    #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast { background: #1E293B; color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.18); animation: toastIn .25s ease; pointer-events: auto; }
+    .toast.success { border-left: 4px solid #22C55E; }
+    .toast.error { border-left: 4px solid #EF4444; }
+    .toast.info { border-left: 4px solid #F97316; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+    /* Modal */
+    .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-box { background: #fff; border-radius: 24px; width: 100%; max-width: 480px; padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
+    .modal-box-wide { background: #fff; border-radius: 24px; width: 100%; max-width: 820px; max-height: 92vh; overflow-y: auto; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.22); }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+    /* Lock overlay */
+    .locked-overlay { position: absolute; inset: 0; background: rgba(255,255,255,.7); border-radius: 12px; display: flex; align-items: center; justify-content: center; z-index: 2; backdrop-filter: blur(2px); }
+    /* Category scroll */
+    .cat-scroll { overflow-x: auto; scrollbar-width: none; }
+    .cat-scroll::-webkit-scrollbar { display: none; }
+    /* Animated dot pulse for live badge */
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
+    .live-dot { width: 8px; height: 8px; background: #22C55E; border-radius: 50%; animation: pulse-dot 1.5s ease infinite; }
+    /* Veg / Non-veg indicator */
+    .veg-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid; flex-shrink: 0; }
+    .veg-dot.veg { background: #22C55E; border-color: #16A34A; }
+    .veg-dot.nonveg { background: #EF4444; border-color: #DC2626; }
+    /* Thin border for restaurant cards */
+    .restaurant-card { border: 2px solid #E2E8F0; border-radius: 16px; }
+    /* Dropzone */
+    .menu-dropzone { border: 2px dashed #CBD5E1; border-radius: 16px; transition: border-color .15s, background .15s; }
+    .menu-dropzone.dragover { border-color: #F97316; background: #FFF7ED; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- ===== LANDING VIEW ===== -->
+<div id="view-landing" class="min-h-screen flex flex-col">
+  <!-- Hero Header -->
+  <div class="brand-gradient text-white py-14 px-6 text-center relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image:radial-gradient(circle at 20% 50%, #fff 1px, transparent 1px),radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px); background-size:40px 40px;"></div>
+    <div class="relative z-10 max-w-xl mx-auto">
+      <div class="text-5xl mb-3">🛒</div>
+      <h1 class="font-jakarta text-4xl font-800 tracking-tight mb-2">GatherCart</h1>
+      <p class="text-orange-100 text-lg font-medium">Group ordering, made ridiculously easy.<br/>Everyone picks. One cart. Zero chaos.</p>
+    </div>
+  </div>
+
+  <!-- Tab switcher + forms -->
+  <div class="flex-1 flex flex-col items-center px-4 py-10 max-w-md mx-auto w-full">
+    <!-- Tabs -->
+    <div class="flex gap-2 p-1 bg-slate-100 rounded-2xl w-full mb-8">
+      <button id="tab-create" onclick="switchLandingTab('create')" class="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all tab-active">🏠 Create Space</button>
+      <button id="tab-join" onclick="switchLandingTab('join')" class="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-500 transition-all">🔗 Join Space</button>
+    </div>
+
+    <!-- Create Form -->
+    <div id="form-create" class="w-full">
+      <div class="card p-6 shadow-sm w-full">
+        <h2 class="font-jakarta font-700 text-xl mb-1">Create a new Space</h2>
+        <p class="text-slate-500 text-sm mb-5">Share the code with your group and start ordering together.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Space Name</label>
+            <input id="inp-space-name" type="text" placeholder="e.g. Friday Lunch Order" maxlength="40"
+              class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Your Name (Host)</label>
+            <input id="inp-host-name" type="text" placeholder="e.g. Alex" maxlength="30"
+              class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white" />
+          </div>
+          <button onclick="createSpace()" class="btn-brand w-full py-3 text-sm mt-2">Create Space →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Form -->
+    <div id="form-join" class="w-full hidden">
+      <div class="card p-6 shadow-sm w-full">
+        <h2 class="font-jakarta font-700 text-xl mb-1">Join a Space</h2>
+        <p class="text-slate-500 text-sm mb-5">Enter the 6-character code shared by the host.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Space Code</label>
+            <input id="inp-join-code" type="text" placeholder="e.g. AB12CD" maxlength="6"
+              class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white uppercase tracking-widest font-mono" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Your Name</label>
+            <input id="inp-join-name" type="text" placeholder="e.g. Sam" maxlength="30"
+              class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white" />
+          </div>
+          <button onclick="joinSpace()" class="btn-brand w-full py-3 text-sm mt-2">Join Space →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Spaces -->
+    <div id="recent-spaces-section" class="w-full mt-6 hidden">
+      <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Recent Spaces</h3>
+      <div id="recent-spaces-list" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ROOM VIEW ===== -->
+<div id="view-room" class="hidden min-h-screen flex flex-col">
+  <!-- Top Nav -->
+  <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🛒</span>
+        <span class="font-jakarta font-800 text-orange-500 text-lg hidden sm:block">GatherCart</span>
+        <div class="flex items-center gap-1.5 ml-2">
+          <div class="live-dot" id="sync-dot"></div>
+          <span class="text-xs text-green-600 font-semibold" id="sync-label">Live</span>
+        </div>
+      </div>
+      <div class="flex-1 min-w-0 text-center">
+        <div id="room-title" class="font-jakarta font-700 text-slate-800 truncate text-sm sm:text-base"></div>
+        <div class="flex items-center justify-center gap-2">
+          <span class="text-xs text-slate-400">Code:</span>
+          <span id="room-code-display" class="font-mono text-xs font-700 text-orange-600 tracking-widest bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200"></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="openQRModal()" title="Invite" class="btn-ghost px-3 py-2 text-sm flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 3.5a.5.5 0 11-1 0 .5.5 0 011 0zM6 7.5a.5.5 0 11-1 0 .5.5 0 011 0zm10.5 0a.5.5 0 11-1 0 .5.5 0 011 0zM6 20.5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
+          <span class="hidden sm:inline">Invite</span>
+        </button>
+        <button onclick="leaveRoom()" class="btn-ghost px-3 py-2 text-sm text-red-500">Leave</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Room Body -->
+  <div class="flex-1 max-w-7xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+    <!-- LEFT COLUMN -->
+    <div class="space-y-5">
+
+      <!-- Members Row -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-semibold text-slate-700">👥 Members</span>
+          <span id="member-count-badge" class="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200"></span>
+        </div>
+        <div id="members-list" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <!-- Restaurant Selector (host only) or banner (members) -->
+      <div id="restaurant-panel" class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-semibold text-slate-700">🍽️ Restaurant</span>
+          <div class="flex items-center gap-2">
+            <button id="scan-upload-menu-btn" onclick="openMenuScannerModal()" class="hidden text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 shadow-sm">
+              <span>📸</span><span>Scan / Upload Menu</span>
+            </button>
+            <span id="host-only-badge" class="hidden text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">Host Only</span>
+          </div>
+        </div>
+        <!-- Host view -->
+        <div id="restaurant-selector-host" class="hidden">
+          <p class="text-xs text-slate-400 mb-3">Pick a restaurant or scan/upload any paper, photo, PDF, or text menu.</p>
+          <div id="restaurant-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+          <button id="change-restaurant-btn" onclick="changeRestaurant()" class="hidden btn-ghost w-full py-2.5 text-sm mt-3">↩ Change Restaurant</button>
+        </div>
+        <!-- Member view -->
+        <div id="restaurant-banner-member" class="hidden">
+          <p class="text-xs text-slate-400 mb-2">Host selected:</p>
+          <div id="member-restaurant-banner" class="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+            <span id="member-restaurant-emoji" class="text-2xl"></span>
+            <div>
+              <div id="member-restaurant-name" class="font-semibold text-slate-800 text-sm"></div>
+              <div id="member-restaurant-cuisine" class="text-xs text-slate-500"></div>
+            </div>
+          </div>
+        </div>
+        <!-- No restaurant yet -->
+        <div id="restaurant-none-msg" class="text-sm text-slate-400 italic">No restaurant selected yet.</div>
+      </div>
+
+      <!-- Menu Browser Panel -->
+      <div id="menu-panel" class="card p-4 hidden">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-semibold text-slate-700">📋 Menu</span>
+          <span id="menu-restaurant-label" class="text-xs text-orange-600 font-semibold"></span>
+        </div>
+        <!-- Category Tabs -->
+        <div id="menu-category-tabs" class="cat-scroll flex gap-2 pb-2 mb-4"></div>
+        <!-- Menu Items Grid -->
+        <div id="menu-items-grid" class="space-y-2"></div>
+      </div>
+
+      <!-- Custom Item Form -->
+      <div class="card p-4">
+        <button onclick="toggleCustomForm()" class="flex items-center justify-between w-full">
+          <span class="text-sm font-semibold text-slate-700">✏️ Add Custom Item</span>
+          <svg id="custom-form-chevron" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="custom-form-body" class="hidden mt-4 space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Item Name *</label>
+              <input id="custom-name" type="text" placeholder="e.g. Extra Cheese" maxlength="60"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Qty</label>
+              <input id="custom-qty" type="number" value="1" min="1" max="99"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Price (₹)</label>
+              <input id="custom-price" type="number" placeholder="0" min="0"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Note (optional)</label>
+              <input id="custom-note" type="text" placeholder="e.g. No onions" maxlength="100"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white" />
+            </div>
+          </div>
+          <button onclick="addCustomItem()" class="btn-brand w-full py-2.5 text-sm">+ Add to Cart</button>
+        </div>
+      </div>
+
+      <!-- Invite Card -->
+      <div class="card p-4">
+        <div class="text-sm font-semibold text-slate-700 mb-3">📨 Invite to this Space</div>
+        <div class="flex gap-2">
+          <input id="invite-link-display" readonly type="text" class="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-500 font-mono" />
+          <button onclick="copyInviteLink()" class="btn-brand px-4 py-2 text-sm">Copy</button>
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button onclick="openQRModal()" class="btn-ghost flex-1 py-2 text-sm flex items-center justify-center gap-1.5">
+            <span>QR Code</span>
+          </button>
+          <button onclick="openMemberTab()" class="btn-ghost flex-1 py-2 text-sm">Open Member Tab</button>
+        </div>
+      </div>
+    </div><!-- /LEFT -->
+
+    <!-- RIGHT COLUMN — Shared Cart -->
+    <div class="card p-4 flex flex-col min-h-[500px]">
+      <!-- Cart Header -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-slate-700">🛒 Shared Cart</span>
+          <span id="cart-locked-badge" class="hidden text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full border border-red-200">🔒 Locked</span>
+        </div>
+        <div id="cart-item-count" class="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200"></div>
+      </div>
+
+      <!-- Member filter tabs -->
+      <div id="cart-member-tabs" class="cat-scroll flex gap-2 mb-4"></div>
+
+      <!-- Cart items -->
+      <div id="cart-items-container" class="flex-1 overflow-y-auto space-y-2 min-h-[200px]"></div>
+
+      <!-- Cart Totals -->
+      <div id="cart-totals" class="mt-4 pt-4 border-t border-slate-100 space-y-1.5"></div>
+
+      <!-- Host Controls -->
+      <div id="host-controls" class="hidden mt-4 pt-4 border-t border-slate-100">
+        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Host Controls</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="lock-cart-btn" onclick="toggleLockCart()" class="btn-ghost py-2.5 text-sm">🔒 Lock Cart</button>
+          <button onclick="copyOrderSummary()" class="btn-ghost py-2.5 text-sm">📋 Copy Summary</button>
+          <button onclick="confirmClearAll()" class="btn-danger py-2.5 text-sm col-span-2">🗑️ Clear All Items</button>
+        </div>
+      </div>
+    </div><!-- /RIGHT -->
+
+  </div>
+</div>
+
+<!-- ===== SCAN / UPLOAD MENU MODAL ===== -->
+<div id="menu-scanner-modal" class="modal-bg hidden" onclick="closeMenuScannerModal(event)">
+  <div class="modal-box-wide" onclick="event.stopPropagation()">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="font-jakarta font-700 text-xl text-slate-800">📸 Scan or Upload Menu</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Extract items & prices from a photo, camera scan, PDF, or text so everyone can order directly.</p>
+      </div>
+      <button onclick="closeMenuScannerModal()" class="text-slate-400 hover:text-slate-700 text-xl px-2">✕</button>
+    </div>
+
+    <!-- Source Tabs -->
+    <div class="flex gap-2 p-1 bg-slate-100 rounded-2xl mb-5">
+      <button id="scan-tab-upload" onclick="switchScannerTab('upload')" class="flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all tab-active">📤 Upload File</button>
+      <button id="scan-tab-camera" onclick="switchScannerTab('camera')" class="flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-500 transition-all">📷 Scan Camera</button>
+      <button id="scan-tab-paste" onclick="switchScannerTab('paste')" class="flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-500 transition-all">📝 Paste Text</button>
+    </div>
+
+    <!-- TAB 1: UPLOAD FILE -->
+    <div id="scan-panel-upload" class="mb-5">
+      <div id="menu-dropzone" class="menu-dropzone p-6 text-center cursor-pointer bg-slate-50 hover:bg-orange-50/40"
+           onclick="document.getElementById('menu-file-input').click()"
+           ondragover="handleMenuDragOver(event)"
+           ondragleave="handleMenuDragLeave(event)"
+           ondrop="handleMenuDrop(event)">
+        <div class="text-3xl mb-2">📄📸</div>
+        <div class="text-sm font-semibold text-slate-700">Click to upload or drag & drop a menu</div>
+        <div class="text-xs text-slate-400 mt-1">Supports Menu Photos (JPG, PNG, WEBP), PDFs, TXT, CSV, or JSON</div>
+        <input id="menu-file-input" type="file" accept="image/*,.pdf,.txt,.csv,.json" class="hidden" onchange="handleMenuFileSelect(event)" />
+      </div>
+    </div>
+
+    <!-- TAB 2: CAMERA SCAN -->
+    <div id="scan-panel-camera" class="hidden mb-5">
+      <div class="bg-slate-900 rounded-2xl overflow-hidden relative flex flex-col items-center justify-center min-h-[240px]">
+        <video id="menu-camera-video" autoplay playsinline class="w-full max-h-[320px] object-contain hidden"></video>
+        <div id="camera-placeholder" class="p-6 text-center text-slate-300">
+          <div class="text-3xl mb-2">📷</div>
+          <p class="text-sm mb-3">Point your camera at a printed or screen menu to capture and extract items.</p>
+          <div class="flex flex-wrap gap-2 justify-center">
+            <button onclick="startMenuCamera()" class="btn-brand px-4 py-2 text-xs">Start Camera</button>
+            <button onclick="document.getElementById('menu-native-camera-input').click()" class="btn-ghost px-4 py-2 text-xs">Use Device Camera App</button>
+          </div>
+          <input id="menu-native-camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleMenuFileSelect(event)" />
+        </div>
+        <div id="camera-controls" class="hidden absolute bottom-3 inset-x-0 flex justify-center gap-3 px-4">
+          <button onclick="captureMenuPhoto()" class="btn-brand px-5 py-2.5 text-xs shadow-lg">📸 Capture & Scan Menu</button>
+          <button onclick="stopMenuCamera()" class="bg-slate-800/80 text-white px-4 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-700">Stop</button>
+        </div>
+      </div>
+      <canvas id="menu-capture-canvas" class="hidden"></canvas>
+    </div>
+
+    <!-- TAB 3: PASTE TEXT -->
+    <div id="scan-panel-paste" class="hidden mb-5">
+      <div class="flex items-center justify-between mb-1.5">
+        <label class="text-xs font-semibold text-slate-600">Paste menu items with prices</label>
+        <button onclick="fillSampleMenuText()" class="text-xs text-orange-600 hover:underline font-semibold">Try Sample Menu</button>
+      </div>
+      <textarea id="menu-paste-textarea" rows="5"
+        placeholder="STARTERS&#10;Paneer Tikka - ₹260&#10;Crispy Corn - ₹190&#10;&#10;MAIN COURSE&#10;Butter Chicken - ₹320&#10;Garlic Naan - ₹80"
+        class="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50"></textarea>
+      <button onclick="parsePastedMenuText()" class="btn-brand px-4 py-2 text-xs mt-2">Extract Items & Prices →</button>
+    </div>
+
+    <!-- OCR / Extraction Progress Bar -->
+    <div id="menu-ocr-status" class="hidden mb-5 p-3.5 rounded-xl bg-orange-50 border border-orange-200">
+      <div class="flex items-center justify-between text-xs font-semibold text-orange-800 mb-1.5">
+        <span id="menu-ocr-status-text">Scanning menu...</span>
+        <span id="menu-ocr-status-pct">0%</span>
+      </div>
+      <div class="w-full bg-orange-200/60 rounded-full h-2 overflow-hidden">
+        <div id="menu-ocr-progress-bar" class="brand-gradient h-2 rounded-full transition-all duration-200" style="width: 10%;"></div>
+      </div>
+    </div>
+
+    <!-- Preview + Extracted Items Editor -->
+    <div id="menu-editor-section" class="border-t border-slate-200 pt-5">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+        <!-- Left Preview (when image is uploaded/captured) -->
+        <div id="menu-image-preview-col" class="hidden md:col-span-4 space-y-2">
+          <div class="text-xs font-semibold text-slate-600">Menu Preview</div>
+          <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 max-h-[340px] overflow-y-auto">
+            <img id="menu-preview-img" alt="Uploaded menu preview" class="w-full h-auto object-contain" />
+          </div>
+          <button onclick="toggleRawOcrBox()" class="text-xs text-slate-500 hover:text-orange-600 font-semibold">View / Edit Raw Extracted Text ▾</button>
+          <div id="raw-ocr-box" class="hidden space-y-2">
+            <textarea id="raw-ocr-textarea" rows="5" class="w-full border border-slate-200 rounded-xl p-2 text-xs font-mono bg-slate-50"></textarea>
+            <button onclick="reparseRawOcrText()" class="btn-ghost w-full py-1.5 text-xs">Re-extract from Text</button>
+          </div>
+        </div>
+
+        <!-- Right Items Builder -->
+        <div id="menu-items-editor-col" class="md:col-span-12 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Restaurant / Menu Name *</label>
+              <input id="scanned-rest-name" type="text" placeholder="e.g. Corner Bistro" maxlength="45"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Cuisine / Label</label>
+              <input id="scanned-rest-cuisine" type="text" placeholder="e.g. Scanned Menu" maxlength="30"
+                class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white" />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-700">Menu Items & Prices</span>
+              <span id="scanned-items-count-badge" class="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">0 items</span>
+            </div>
+            <button onclick="addEmptyScannedItemRow()" class="text-xs bg-orange-50 hover:bg-orange-100 text-orange-600 font-semibold px-3 py-1.5 rounded-lg border border-orange-200 transition-colors">+ Add Item Row</button>
+          </div>
+
+          <!-- Editable Items List -->
+          <div id="scanned-items-list" class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+            <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
+              Upload or scan a menu above, or click <strong>+ Add Item Row</strong> to enter items manually.
+            </div>
+          </div>
+
+          <!-- Save Footer -->
+          <div class="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100">
+            <button onclick="closeMenuScannerModal()" class="btn-ghost py-2.5 px-4 text-sm sm:w-auto">Cancel</button>
+            <button onclick="saveAndSelectScannedMenu()" class="btn-brand flex-1 py-2.5 px-5 text-sm">✓ Save Menu & Open for Ordering</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== QR MODAL ===== -->
+<div id="qr-modal" class="modal-bg hidden" onclick="closeQRModal(event)">
+  <div class="modal-box text-center" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="font-jakarta font-700 text-xl">Invite to Space</h2>
+      <button onclick="closeQRModal()" class="text-slate-400 hover:text-slate-700 text-xl">✕</button>
+    </div>
+    <div class="bg-slate-50 rounded-2xl p-5 inline-block mb-4 border border-slate-200">
+      <canvas id="qr-canvas"></canvas>
+    </div>
+    <div class="font-mono text-3xl font-800 tracking-[0.3em] text-orange-500 mb-1" id="qr-space-code"></div>
+    <p class="text-slate-400 text-sm mb-5">Share this code or link with your group</p>
+    <div class="flex gap-2">
+      <input id="qr-invite-link" readonly type="text" class="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-xs bg-slate-50 text-slate-500 font-mono" />
+      <button onclick="copyInviteLink()" class="btn-brand px-4 py-2.5 text-sm">Copy</button>
+    </div>
+    <button onclick="openMemberTab()" class="btn-ghost w-full py-2.5 text-sm mt-3">↗ Open Member Tab</button>
+  </div>
+</div>
+
+<!-- ===== CONFIRM MODAL ===== -->
+<div id="confirm-modal" class="modal-bg hidden" onclick="closeConfirmModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="text-3xl mb-3 text-center" id="confirm-icon">⚠️</div>
+    <h2 class="font-jakarta font-700 text-xl text-center mb-2" id="confirm-title"></h2>
+    <p class="text-slate-500 text-sm text-center mb-6" id="confirm-desc"></p>
+    <div class="flex gap-3">
+      <button onclick="closeConfirmModal()" class="btn-ghost flex-1 py-3 text-sm">Cancel</button>
+      <button id="confirm-ok-btn" class="btn-danger flex-1 py-3 text-sm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// 1. EMBEDDED PURE-JAVASCRIPT QR CODE GENERATOR (ZERO EXTERNAL DEPENDENCY)
+//    Supports UTF-8 Byte Mode, Versions 1–14, Reed-Solomon Error Correction
+//    (Level L), and ISO/IEC 18004 optimal mask selection.
+// =========================================================================
+const PureQR = (function () {
+  // Galois Field GF(256) lookup tables with primitive polynomial 0x11D
+  const GF_EXP = new Uint8Array(512);
+  const GF_LOG = new Uint8Array(256);
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    GF_EXP[i] = x;
+    GF_LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11D;
+  }
+  for (let i = 255; i < 512; i++) {
+    GF_EXP[i] = GF_EXP[i - 255];
+  }
+
+  function gfMul(a, b) {
+    if (a === 0 || b === 0) return 0;
+    return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+  }
+
+  function rsGeneratorPoly(degree) {
+    let poly = [1];
+    for (let i = 0; i < degree; i++) {
+      const next = new Array(poly.length + 1).fill(0);
+      const factor = GF_EXP[i];
+      for (let j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gfMul(poly[j], factor);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function rsComputeECC(data, ecCount) {
+    const gen = rsGeneratorPoly(ecCount);
+    const res = new Array(data.length + ecCount).fill(0);
+    for (let i = 0; i < data.length; i++) res[i] = data[i];
+    for (let i = 0; i < data.length; i++) {
+      const coef = res[i];
+      if (coef !== 0) {
+        for (let j = 0; j < gen.length; j++) {
+          res[i + j] ^= gfMul(gen[j], coef);
+        }
+      }
+    }
+    return res.slice(data.length);
+  }
+
+  // Error Correction Level L specifications for Versions 1 through 14
+  const VERSION_TABLE = [
+    null,
+    { cap: 17,  ecPerBlock: 7,  blocks: [19] },
+    { cap: 32,  ecPerBlock: 10, blocks: [34] },
+    { cap: 53,  ecPerBlock: 15, blocks: [55] },
+    { cap: 78,  ecPerBlock: 20, blocks: [80] },
+    { cap: 106, ecPerBlock: 26, blocks: [108] },
+    { cap: 134, ecPerBlock: 18, blocks: [68, 68] },
+    { cap: 154, ecPerBlock: 20, blocks: [78, 78] },
+    { cap: 192, ecPerBlock: 24, blocks: [97, 97] },
+    { cap: 230, ecPerBlock: 30, blocks: [116, 116] },
+    { cap: 271, ecPerBlock: 18, blocks: [68, 68, 69, 69] },
+    { cap: 321, ecPerBlock: 20, blocks: [81, 81, 81, 81] },
+    { cap: 367, ecPerBlock: 24, blocks: [92, 92, 93, 93] },
+    { cap: 425, ecPerBlock: 26, blocks: [107, 107, 107, 107] },
+    { cap: 458, ecPerBlock: 30, blocks: [115, 115, 115, 116] }
+  ];
+
+  const ALIGN_COORDS = [
+    null,
+    [],
+    [6, 18],
+    [6, 22],
+    [6, 26],
+    [6, 30],
+    [6, 34],
+    [6, 22, 38],
+    [6, 24, 42],
+    [6, 26, 46],
+    [6, 28, 50],
+    [6, 30, 54],
+    [6, 32, 58],
+    [6, 34, 62],
+    [6, 26, 46, 66]
+  ];
+
+  function utf8Bytes(str) {
+    if (typeof TextEncoder !== "undefined") {
+      return Array.from(new TextEncoder().encode(str));
+    }
+    const encoded = unescape(encodeURIComponent(str));
+    const arr = [];
+    for (let i = 0; i < encoded.length; i++) arr.push(encoded.charCodeAt(i));
+    return arr;
+  }
+
+  function computeFormatBits(maskIndex) {
+    const data = (0b01 << 3) | maskIndex;
+    let rem = data << 10;
+    const poly = 0x537;
+    for (let i = 4; i >= 0; i--) {
+      if (rem & (1 << (i + 10))) {
+        rem ^= poly << i;
+      }
+    }
+    return ((data << 10) | rem) ^ 0x5412;
+  }
+
+  function computeVersionBits(version) {
+    let rem = version << 12;
+    const poly = 0x1F25;
+    for (let i = 5; i >= 0; i--) {
+      if (rem & (1 << (i + 12))) {
+        rem ^= poly << i;
+      }
+    }
+    return (version << 12) | rem;
+  }
+
+  function buildMatrix(text) {
+    const bytes = utf8Bytes(text);
+    let version = 1;
+    while (version < VERSION_TABLE.length && VERSION_TABLE[version].cap < bytes.length) {
+      version++;
+    }
+    if (version >= VERSION_TABLE.length) {
+      version = VERSION_TABLE.length - 1;
+      bytes.length = VERSION_TABLE[version].cap;
+    }
+
+    const spec = VERSION_TABLE[version];
+    const totalDataBytes = spec.blocks.reduce((a, b) => a + b, 0);
+    const totalDataBits = totalDataBytes * 8;
+
+    const bits = [];
+    function pushBits(val, len) {
+      for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1);
+    }
+
+    pushBits(0b0100, 4);
+    pushBits(bytes.length, version <= 9 ? 8 : 16);
+    for (let i = 0; i < bytes.length; i++) pushBits(bytes[i], 8);
+
+    const termLen = Math.min(4, totalDataBits - bits.length);
+    pushBits(0, termLen);
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    let padToggle = 0;
+    while (bits.length < totalDataBits) {
+      pushBits(padToggle === 0 ? 0xEC : 0x11, 8);
+      padToggle ^= 1;
+    }
+
+    const dataCodewords = [];
+    for (let i = 0; i < bits.length; i += 8) {
+      let byteVal = 0;
+      for (let b = 0; b < 8; b++) byteVal = (byteVal << 1) | bits[i + b];
+      dataCodewords.push(byteVal);
+    }
+
+    const dataBlocks = [];
+    const ecBlocks = [];
+    let offset = 0;
+    for (const blockLen of spec.blocks) {
+      const slice = dataCodewords.slice(offset, offset + blockLen);
+      offset += blockLen;
+      dataBlocks.push(slice);
+      ecBlocks.push(rsComputeECC(slice, spec.ecPerBlock));
+    }
+
+    const finalCodewords = [];
+    const maxDataLen = Math.max(...dataBlocks.map(b => b.length));
+    for (let i = 0; i < maxDataLen; i++) {
+      for (const block of dataBlocks) {
+        if (i < block.length) finalCodewords.push(block[i]);
+      }
+    }
+    for (let i = 0; i < spec.ecPerBlock; i++) {
+      for (const block of ecBlocks) {
+        if (i < block.length) finalCodewords.push(block[i]);
+      }
+    }
+
+    const size = 17 + 4 * version;
+    const modules = Array.from({ length: size }, () => new Array(size).fill(false));
+    const isFunc = Array.from({ length: size }, () => new Array(size).fill(false));
+
+    function setFunc(r, c, dark) {
+      if (r >= 0 && r < size && c >= 0 && c < size) {
+        modules[r][c] = dark;
+        isFunc[r][c] = true;
+      }
+    }
+
+    function placeFinder(top, left) {
+      for (let dr = -1; dr <= 7; dr++) {
+        for (let dc = -1; dc <= 7; dc++) {
+          const r = top + dr;
+          const c = left + dc;
+          if (r < 0 || r >= size || c < 0 || c >= size) continue;
+          const inOuter = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+          const onBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+          const inCenter = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+          setFunc(r, c, inOuter && (onBorder || inCenter));
+        }
+      }
+    }
+    placeFinder(0, 0);
+    placeFinder(0, size - 7);
+    placeFinder(size - 7, 0);
+
+    const coords = ALIGN_COORDS[version];
+    for (const cy of coords) {
+      for (const cx of coords) {
+        if (isFunc[cy][cx]) continue;
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            const dark = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
+            setFunc(cy + dr, cx + dc, dark);
+          }
+        }
+      }
+    }
+
+    for (let i = 8; i < size - 8; i++) {
+      if (!isFunc[6][i]) setFunc(6, i, i % 2 === 0);
+      if (!isFunc[i][6]) setFunc(i, 6, i % 2 === 0);
+    }
+
+    for (let i = 0; i <= 8; i++) {
+      if (!isFunc[8][i]) setFunc(8, i, false);
+      if (!isFunc[i][8]) setFunc(i, 8, false);
+    }
+    for (let i = 0; i < 8; i++) {
+      setFunc(8, size - 1 - i, false);
+      setFunc(size - 1 - i, 8, false);
+    }
+    setFunc(size - 8, 8, true);
+
+    if (version >= 7) {
+      const vBits = computeVersionBits(version);
+      for (let i = 0; i < 18; i++) {
+        const bit = ((vBits >>> i) & 1) === 1;
+        const r = Math.floor(i / 3);
+        const c = size - 11 + (i % 3);
+        setFunc(r, c, bit);
+        setFunc(c, r, bit);
+      }
+    }
+
+    const allBits = [];
+    for (const cw of finalCodewords) {
+      for (let b = 7; b >= 0; b--) allBits.push(((cw >>> b) & 1) === 1);
+    }
+
+    let bitIdx = 0;
+    let upward = true;
+    for (let rightCol = size - 1; rightCol >= 1; rightCol -= 2) {
+      if (rightCol === 6) rightCol--;
+      for (let step = 0; step < size; step++) {
+        const r = upward ? size - 1 - step : step;
+        for (let dx = 0; dx < 2; dx++) {
+          const c = rightCol - dx;
+          if (!isFunc[r][c]) {
+            modules[r][c] = bitIdx < allBits.length ? allBits[bitIdx++] : false;
+          }
+        }
+      }
+      upward = !upward;
+    }
+
+    const masks = [
+      (r, c) => (r + c) % 2 === 0,
+      (r, c) => r % 2 === 0,
+      (r, c) => c % 3 === 0,
+      (r, c) => (r + c) % 3 === 0,
+      (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+      (r, c) => ((r * c) % 2 + (r * c) % 3) === 0,
+      (r, c) => (((r * c) % 2 + (r * c) % 3) % 2) === 0,
+      (r, c) => (((r + c) % 2 + (r * c) % 3) % 2) === 0
+    ];
+
+    function applyMaskAndFormat(maskIdx) {
+      const grid = modules.map(row => row.slice());
+      const fn = masks[maskIdx];
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (!isFunc[r][c] && fn(r, c)) {
+            grid[r][c] = !grid[r][c];
+          }
+        }
+      }
+      const fmt = computeFormatBits(maskIdx);
+      for (let i = 0; i < 6; i++) grid[8][i] = ((fmt >>> i) & 1) === 1;
+      grid[8][7] = ((fmt >>> 6) & 1) === 1;
+      grid[8][8] = ((fmt >>> 7) & 1) === 1;
+      grid[7][8] = ((fmt >>> 8) & 1) === 1;
+      for (let i = 9; i < 15; i++) grid[14 - i][8] = ((fmt >>> i) & 1) === 1;
+
+      for (let i = 0; i < 8; i++) grid[size - 1 - i][8] = ((fmt >>> i) & 1) === 1;
+      for (let i = 8; i < 15; i++) grid[8][size - 15 + i] = ((fmt >>> i) & 1) === 1;
+      return grid;
+    }
+
+    function scoreGrid(grid) {
+      let penalty = 0;
+      for (let r = 0; r < size; r++) {
+        let run = 1;
+        for (let c = 1; c < size; c++) {
+          if (grid[r][c] === grid[r][c - 1]) {
+            run++;
+            if (run === 5) penalty += 3;
+            else if (run > 5) penalty += 1;
+          } else {
+            run = 1;
+          }
+        }
+      }
+      for (let c = 0; c < size; c++) {
+        let run = 1;
+        for (let r = 1; r < size; r++) {
+          if (grid[r][c] === grid[r - 1][c]) {
+            run++;
+            if (run === 5) penalty += 3;
+            else if (run > 5) penalty += 1;
+          } else {
+            run = 1;
+          }
+        }
+      }
+      for (let r = 0; r < size - 1; r++) {
+        for (let c = 0; c < size - 1; c++) {
+          const v = grid[r][c];
+          if (v === grid[r][c + 1] && v === grid[r + 1][c] && v === grid[r + 1][c + 1]) {
+            penalty += 3;
+          }
+        }
+      }
+      return penalty;
+    }
+
+    let bestGrid = null;
+    let bestScore = Infinity;
+    for (let m = 0; m < 8; m++) {
+      const candidate = applyMaskAndFormat(m);
+      const s = scoreGrid(candidate);
+      if (s < bestScore) {
+        bestScore = s;
+        bestGrid = candidate;
+      }
+    }
+    return bestGrid;
+  }
+
+  function renderToCanvas(canvas, text, pixelSize) {
+    if (!canvas) return;
+    const grid = buildMatrix(text);
+    const quiet = 4;
+    const modulesCount = grid.length + quiet * 2;
+    const scale = Math.max(2, Math.floor(pixelSize / modulesCount));
+    const actualSize = modulesCount * scale;
+
+    canvas.width = actualSize;
+    canvas.height = actualSize;
+    canvas.style.width = `${pixelSize}px`;
+    canvas.style.height = `${pixelSize}px`;
+
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, actualSize, actualSize);
+
+    ctx.fillStyle = "#0F172A";
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid.length; c++) {
+        if (grid[r][c]) {
+          ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+        }
+      }
+    }
+  }
+
+  return { renderToCanvas };
+})();
+
+// =========================================================================
+// 2. DEMO RESTAURANTS DATA
+// =========================================================================
+const DEMO_RESTAURANTS = [
+  {
+    id: "burger-palace",
+    name: "Burger Palace 🍔",
+    cuisine: "American Fast Food",
+    rating: 4.5,
+    deliveryTime: "20-30 min",
+    minOrder: 199,
+    emoji: "🍔",
+    color: "#F97316",
+    categories: ["Burgers", "Sides", "Drinks", "Desserts"],
+    menu: [
+      { id: "bp1", name: "Classic Smash Burger", category: "Burgers", price: 249, desc: "Double smash patty, American cheese, pickles, onion, special sauce", veg: false, bestseller: true },
+      { id: "bp2", name: "Crispy Chicken Burger", category: "Burgers", price: 229, desc: "Crispy fried chicken, coleslaw, jalapeño mayo", veg: false, bestseller: true },
+      { id: "bp3", name: "Mushroom Swiss Burger", category: "Burgers", price: 269, desc: "Beef patty, sautéed mushrooms, Swiss cheese, garlic aioli", veg: false },
+      { id: "bp4", name: "Veggie Bean Burger", category: "Burgers", price: 199, desc: "Spiced black bean patty, avocado, lettuce, tomato", veg: true },
+      { id: "bp5", name: "BBQ Bacon Double", category: "Burgers", price: 299, desc: "Two beef patties, crispy bacon, BBQ sauce, cheddar, onion rings", veg: false },
+      { id: "bp6", name: "Loaded Fries", category: "Sides", price: 149, desc: "Crispy fries with cheese sauce, jalapeños, sour cream", veg: true, bestseller: true },
+      { id: "bp7", name: "Onion Rings", category: "Sides", price: 129, desc: "Beer-battered crispy onion rings with ranch dip", veg: true },
+      { id: "bp8", name: "Mozzarella Sticks", category: "Sides", price: 159, desc: "6 pieces, served with marinara sauce", veg: true },
+      { id: "bp9", name: "Coleslaw", category: "Sides", price: 79, desc: "Creamy homestyle coleslaw", veg: true },
+      { id: "bp10", name: "Classic Milkshake", category: "Drinks", price: 179, desc: "Chocolate / Vanilla / Strawberry — thick & creamy", veg: true },
+      { id: "bp11", name: "Fresh Lemonade", category: "Drinks", price: 99, desc: "Freshly squeezed lemonade with mint", veg: true },
+      { id: "bp12", name: "Soft Drink", category: "Drinks", price: 69, desc: "Coke / Pepsi / Sprite / Fanta — 300ml", veg: true },
+      { id: "bp13", name: "Brownie Sundae", category: "Desserts", price: 169, desc: "Warm chocolate brownie, vanilla ice cream, caramel drizzle", veg: true },
+      { id: "bp14", name: "Apple Pie Slice", category: "Desserts", price: 129, desc: "Classic American apple pie, served warm", veg: true },
+    ]
+  },
+  {
+    id: "pizza-corner",
+    name: "Pizza Corner 🍕",
+    cuisine: "Italian",
+    rating: 4.3,
+    deliveryTime: "25-40 min",
+    minOrder: 299,
+    emoji: "🍕",
+    color: "#DC2626",
+    categories: ["Pizzas", "Pastas", "Starters", "Drinks"],
+    menu: [
+      { id: "pc1", name: "Margherita Classic", category: "Pizzas", price: 269, desc: "San Marzano tomato, fresh mozzarella, basil — 10 inch", veg: true, bestseller: true },
+      { id: "pc2", name: "Pepperoni Feast", category: "Pizzas", price: 349, desc: "Double pepperoni, mozzarella, tomato base — 10 inch", veg: false, bestseller: true },
+      { id: "pc3", name: "BBQ Chicken Pizza", category: "Pizzas", price: 379, desc: "Grilled chicken, BBQ sauce, red onion, cheddar — 10 inch", veg: false },
+      { id: "pc4", name: "Veggie Supreme", category: "Pizzas", price: 319, desc: "Bell peppers, mushrooms, olives, onion, paneer — 10 inch", veg: true },
+      { id: "pc5", name: "Four Cheese Pizza", category: "Pizzas", price: 399, desc: "Mozzarella, cheddar, parmesan, ricotta — 10 inch", veg: true },
+      { id: "pc6", name: "Truffle Mushroom Pizza", category: "Pizzas", price: 429, desc: "Truffle oil, porcini mushrooms, fontina, arugula — 10 inch", veg: true, bestseller: true },
+      { id: "pc7", name: "Spaghetti Bolognese", category: "Pastas", price: 299, desc: "Classic slow-cooked beef ragù, parmigiano", veg: false },
+      { id: "pc8", name: "Penne Arrabbiata", category: "Pastas", price: 249, desc: "Spicy tomato sauce, garlic, chilli flakes", veg: true },
+      { id: "pc9", name: "Pasta Alfredo", category: "Pastas", price: 279, desc: "Creamy parmesan sauce, fettuccine, black pepper", veg: true },
+      { id: "pc10", name: "Pesto Chicken Pasta", category: "Pastas", price: 319, desc: "Basil pesto, grilled chicken, sun-dried tomato, penne", veg: false },
+      { id: "pc11", name: "Garlic Bread (4 pcs)", category: "Starters", price: 129, desc: "Toasted with herb butter and garlic", veg: true, bestseller: true },
+      { id: "pc12", name: "Bruschetta", category: "Starters", price: 149, desc: "Toasted ciabatta, tomato, basil, balsamic glaze", veg: true },
+      { id: "pc13", name: "Chicken Wings (6 pcs)", category: "Starters", price: 219, desc: "Buffalo / BBQ / Honey Garlic", veg: false },
+      { id: "pc14", name: "Fresh Lemonade", category: "Drinks", price: 99, desc: "Classic / Mint / Watermelon", veg: true },
+      { id: "pc15", name: "Iced Tea", category: "Drinks", price: 89, desc: "Peach / Lemon / Raspberry", veg: true },
+    ]
+  },
+  {
+    id: "spice-garden",
+    name: "Spice Garden 🍛",
+    cuisine: "Indian",
+    rating: 4.7,
+    deliveryTime: "30-45 min",
+    minOrder: 249,
+    emoji: "🍛",
+    color: "#D97706",
+    categories: ["Starters", "Main Course", "Breads", "Desserts", "Drinks"],
+    menu: [
+      { id: "sg1", name: "Paneer Tikka (6 pcs)", category: "Starters", price: 269, desc: "Cottage cheese marinated in spiced yogurt, grilled in tandoor", veg: true, bestseller: true },
+      { id: "sg2", name: "Chicken Seekh Kebab (4 pcs)", category: "Starters", price: 299, desc: "Minced chicken with herbs and spices, cooked in tandoor", veg: false, bestseller: true },
+      { id: "sg3", name: "Veg Samosa (4 pcs)", category: "Starters", price: 99, desc: "Crispy pastry filled with spiced potatoes and peas", veg: true },
+      { id: "sg4", name: "Chicken 65", category: "Starters", price: 259, desc: "South Indian style crispy fried chicken with curry leaves", veg: false },
+      { id: "sg5", name: "Hara Bhara Kebab (6 pcs)", category: "Starters", price: 199, desc: "Spinach, peas, paneer and spice kebabs — pan fried", veg: true },
+      { id: "sg6", name: "Butter Chicken", category: "Main Course", price: 319, desc: "Tender chicken in rich tomato-cream sauce — the classic", veg: false, bestseller: true },
+      { id: "sg7", name: "Dal Makhani", category: "Main Course", price: 249, desc: "Slow-cooked black lentils in buttery tomato gravy", veg: true, bestseller: true },
+      { id: "sg8", name: "Paneer Butter Masala", category: "Main Course", price: 279, desc: "Soft paneer in creamy onion-tomato gravy", veg: true },
+      { id: "sg9", name: "Chicken Biryani", category: "Main Course", price: 349, desc: "Fragrant basmati rice, tender chicken, whole spices — served with raita", veg: false, bestseller: true },
+      { id: "sg10", name: "Veg Biryani", category: "Main Course", price: 269, desc: "Basmati rice, mixed vegetables, saffron and fried onions", veg: true },
+      { id: "sg11", name: "Palak Paneer", category: "Main Course", price: 269, desc: "Fresh spinach puree with cubes of cottage cheese", veg: true },
+      { id: "sg12", name: "Rogan Josh", category: "Main Course", price: 339, desc: "Slow-braised mutton in Kashmiri spiced gravy", veg: false },
+      { id: "sg13", name: "Butter Naan (2 pcs)", category: "Breads", price: 79, desc: "Soft leavened bread baked in tandoor, brushed with butter", veg: true, bestseller: true },
+      { id: "sg14", name: "Garlic Naan (2 pcs)", category: "Breads", price: 99, desc: "Naan topped with garlic, coriander and butter", veg: true },
+      { id: "sg15", name: "Laccha Paratha (2 pcs)", category: "Breads", price: 89, desc: "Flaky multi-layered whole wheat bread", veg: true },
+      { id: "sg16", name: "Puri (4 pcs)", category: "Breads", price: 69, desc: "Deep-fried whole wheat puffed bread", veg: true },
+      { id: "sg17", name: "Gulab Jamun (4 pcs)", category: "Desserts", price: 119, desc: "Soft khoya dumplings soaked in rose-flavored sugar syrup", veg: true, bestseller: true },
+      { id: "sg18", name: "Rasgulla (4 pcs)", category: "Desserts", price: 109, desc: "Soft chhena balls soaked in light sugar syrup", veg: true },
+      { id: "sg19", name: "Kulfi (Mango/Pista)", category: "Desserts", price: 129, desc: "Traditional Indian ice cream — dense, creamy, frozen", veg: true },
+      { id: "sg20", name: "Mango Lassi", category: "Drinks", price: 109, desc: "Thick yogurt-based mango drink, slightly sweet", veg: true, bestseller: true },
+      { id: "sg21", name: "Masala Chai", category: "Drinks", price: 69, desc: "Spiced Indian tea with ginger, cardamom, cinnamon", veg: true },
+      { id: "sg22", name: "Fresh Lime Soda", category: "Drinks", price: 79, desc: "Sweet / Salty / Mixed", veg: true },
+    ]
+  },
+  {
+    id: "sushi-zen",
+    name: "Sushi Zen 🍣",
+    cuisine: "Japanese",
+    rating: 4.6,
+    deliveryTime: "35-50 min",
+    minOrder: 399,
+    emoji: "🍣",
+    color: "#7C3AED",
+    categories: ["Sushi Rolls", "Nigiri & Sashimi", "Mains", "Drinks"],
+    menu: [
+      { id: "sz1", name: "Dragon Roll (8 pcs)", category: "Sushi Rolls", price: 429, desc: "Shrimp tempura, crab, avocado, cucumber, tobiko", veg: false, bestseller: true },
+      { id: "sz2", name: "California Roll (8 pcs)", category: "Sushi Rolls", price: 349, desc: "Crab, avocado, cucumber, sesame seeds", veg: false, bestseller: true },
+      { id: "sz3", name: "Spicy Tuna Roll (8 pcs)", category: "Sushi Rolls", price: 399, desc: "Fresh tuna, spicy mayo, cucumber, scallion", veg: false },
+      { id: "sz4", name: "Veggie Avocado Roll (8 pcs)", category: "Sushi Rolls", price: 299, desc: "Avocado, cucumber, pickled radish, sesame", veg: true },
+      { id: "sz5", name: "Rainbow Roll (8 pcs)", category: "Sushi Rolls", price: 479, desc: "California roll topped with assorted sashimi and avocado", veg: false, bestseller: true },
+      { id: "sz6", name: "Tempura Roll (8 pcs)", category: "Sushi Rolls", price: 369, desc: "Shrimp tempura, cream cheese, avocado, eel sauce", veg: false },
+      { id: "sz7", name: "Salmon Nigiri (2 pcs)", category: "Nigiri & Sashimi", price: 219, desc: "Hand-pressed rice with fresh Atlantic salmon", veg: false },
+      { id: "sz8", name: "Tuna Sashimi (5 pcs)", category: "Nigiri & Sashimi", price: 349, desc: "Premium sliced bluefin tuna, served with wasabi and gari", veg: false },
+      { id: "sz9", name: "Mixed Nigiri (6 pcs)", category: "Nigiri & Sashimi", price: 549, desc: "Chef's selection of 6 premium nigiri pieces", veg: false, bestseller: true },
+      { id: "sz10", name: "Chicken Ramen", category: "Mains", price: 349, desc: "Rich shoyu broth, chashu chicken, soft-boiled egg, nori, scallions", veg: false, bestseller: true },
+      { id: "sz11", name: "Miso Ramen", category: "Mains", price: 319, desc: "White miso broth, tofu, mushrooms, corn, bamboo shoots", veg: true },
+      { id: "sz12", name: "Teriyaki Salmon Bowl", category: "Mains", price: 399, desc: "Grilled salmon, teriyaki glaze, steamed rice, edamame, pickles", veg: false },
+      { id: "sz13", name: "Edamame (steamed)", category: "Mains", price: 129, desc: "Lightly salted steamed edamame pods", veg: true },
+      { id: "sz14", name: "Ramune Soda", category: "Drinks", price: 129, desc: "Japanese marble-sealed soda — Original / Strawberry / Melon", veg: true },
+      { id: "sz15", name: "Matcha Latte", category: "Drinks", price: 149, desc: "Premium ceremonial matcha, oat milk, light honey", veg: true, bestseller: true },
+      { id: "sz16", name: "Miso Soup", category: "Drinks", price: 99, desc: "Classic dashi miso broth with tofu and wakame", veg: true },
+    ]
+  },
+  {
+    id: "taco-fiesta",
+    name: "Taco Fiesta 🌮",
+    cuisine: "Mexican",
+    rating: 4.4,
+    deliveryTime: "20-35 min",
+    minOrder: 199,
+    emoji: "🌮",
+    color: "#059669",
+    categories: ["Tacos", "Burritos & Bowls", "Sides", "Drinks"],
+    menu: [
+      { id: "tf1", name: "Carne Asada Tacos (3 pcs)", category: "Tacos", price: 279, desc: "Grilled beef, pico de gallo, cilantro, lime, corn tortilla", veg: false, bestseller: true },
+      { id: "tf2", name: "Al Pastor Tacos (3 pcs)", category: "Tacos", price: 269, desc: "Marinated pork, pineapple, onion, cilantro, corn tortilla", veg: false, bestseller: true },
+      { id: "tf3", name: "Crispy Fish Tacos (3 pcs)", category: "Tacos", price: 289, desc: "Beer-battered fish, shredded cabbage, chipotle cream, flour tortilla", veg: false },
+      { id: "tf4", name: "Black Bean Tacos (3 pcs)", category: "Tacos", price: 219, desc: "Spiced black beans, roasted corn, avocado, pico de gallo — vegan", veg: true },
+      { id: "tf5", name: "Paneer Tikka Tacos (3 pcs)", category: "Tacos", price: 249, desc: "Indian-Mexican fusion — tandoori paneer, coriander chutney, pickled onion", veg: true, bestseller: true },
+      { id: "tf6", name: "Chicken Burrito", category: "Burritos & Bowls", price: 299, desc: "Grilled chicken, rice, beans, cheese, sour cream, salsa, flour tortilla", veg: false, bestseller: true },
+      { id: "tf7", name: "Veggie Burrito Bowl", category: "Burritos & Bowls", price: 269, desc: "Cilantro-lime rice, black beans, roasted peppers, corn, guacamole", veg: true },
+      { id: "tf8", name: "Carnitas Bowl", category: "Burritos & Bowls", price: 329, desc: "Slow-braised pork, rice, pinto beans, pico, jalapeño, cheese", veg: false },
+      { id: "tf9", name: "Chips & Guacamole", category: "Sides", price: 149, desc: "Fresh tortilla chips with house-made guacamole", veg: true, bestseller: true },
+      { id: "tf10", name: "Elote (Mexican Corn)", category: "Sides", price: 129, desc: "Grilled corn, mayo, cotija cheese, chili powder, lime", veg: true },
+      { id: "tf11", name: "Loaded Nachos", category: "Sides", price: 199, desc: "Tortilla chips, cheese sauce, jalapeños, sour cream, pico de gallo", veg: true },
+      { id: "tf12", name: "Refried Beans", category: "Sides", price: 99, desc: "Creamy seasoned pinto beans with cheese", veg: true },
+      { id: "tf13", name: "Horchata", category: "Drinks", price: 109, desc: "Traditional rice and cinnamon drink, lightly sweetened", veg: true, bestseller: true },
+      { id: "tf14", name: "Agua Fresca", category: "Drinks", price: 99, desc: "Watermelon / Jamaica (Hibiscus) / Tamarind", veg: true },
+      { id: "tf15", name: "Mexican Hot Chocolate", category: "Drinks", price: 119, desc: "Rich dark chocolate, cinnamon, cayenne pepper — spiced and warming", veg: true },
+    ]
+  }
+];
+
+// =========================================================================
+// 3. CONSTANTS & STATE
+// =========================================================================
+const GC_PREFIX = "gc_space_";
+const GC_RECENT = "gc_recent_spaces";
+const GC_SESSION = "gc_session";
+const GC_SAVED_MENUS = "gc_saved_scanned_menus";
+const MEMBER_COLORS = ["#F97316","#3B82F6","#EC4899","#8B5CF6","#10B981","#F59E0B","#EF4444","#06B6D4","#84CC16","#6366F1"];
+
+let currentSpace = null;
+let currentSession = null;
+let activeMenuCategory = null;
+let cartFilterMemberId = "all";
+let menuItemQtyMap = {}; // itemId -> qty in the inline widget
+let confirmCallback = null;
+
+// Scanner state
+let scannerItems = [];
+let cameraStream = null;
+let tesseractPromise = null;
+let pdfjsPromise = null;
+
+// BroadcastChannel for cross-tab sync
+const syncChannel = (typeof BroadcastChannel !== "undefined")
+  ? new BroadcastChannel("gathercart_sync")
+  : null;
+
+if (syncChannel) {
+  syncChannel.onmessage = (e) => {
+    if (typeof gcEnabled !== "undefined" && gcEnabled) return; // cloud listener handles it
+    if (e.data && e.data.type === "STATE_UPDATE" && currentSession && e.data.spaceCode === currentSession.spaceCode) {
+      reloadSpaceFromStorage();
+    }
+  };
+}
+
+// =========================================================================
+// 4. UTILITY FUNCTIONS
+// =========================================================================
+function genSpaceCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function genId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function getInviteLink(code) {
+  return window.location.href.split("?")[0] + "?join=" + code;
+}
+
+function fmt(price) {
+  const num = Number(price) || 0;
+  return "₹" + (Number.isInteger(num) ? num.toFixed(0) : num.toFixed(2));
+}
+
+function starRating(rating) {
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5;
+  let s = "";
+  for (let i = 0; i < full; i++) s += "★";
+  if (half) s += "½";
+  return `<span class="text-orange-400 text-xs">${s}</span> <span class="text-slate-500 text-xs">${rating}</span>`;
+}
+
+function getSavedCustomRestaurants() {
+  try {
+    return JSON.parse(localStorage.getItem(GC_SAVED_MENUS) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomRestaurantGlobally(rest) {
+  const list = getSavedCustomRestaurants().filter(r => r.id !== rest.id);
+  list.unshift(rest);
+  if (list.length > 10) list.length = 10;
+  localStorage.setItem(GC_SAVED_MENUS, JSON.stringify(list));
+}
+
+function getAllRestaurants(space = currentSpace) {
+  const map = new Map();
+  if (space && Array.isArray(space.customRestaurants)) {
+    space.customRestaurants.forEach(r => map.set(r.id, r));
+  }
+  getSavedCustomRestaurants().forEach(r => {
+    if (!map.has(r.id)) map.set(r.id, r);
+  });
+  DEMO_RESTAURANTS.forEach(r => map.set(r.id, r));
+  return Array.from(map.values());
+}
+
+function ensureRestaurantInSpace(space, id) {
+  if (DEMO_RESTAURANTS.some(r => r.id === id)) return;
+  if (!space.customRestaurants) space.customRestaurants = [];
+  if (!space.customRestaurants.some(r => r.id === id)) {
+    const found = getAllRestaurants(space).find(r => r.id === id);
+    if (found) space.customRestaurants.push(JSON.parse(JSON.stringify(found)));
+  }
+}
+
+// =========================================================================
+// 5. LOCALSTORAGE HELPERS
+// =========================================================================
+function saveSpace(space) {
+  localStorage.setItem(GC_PREFIX + space.code, JSON.stringify(space));
+  updateRecentSpaces(space.code, space.name, currentSession ? currentSession.role : "member");
+  gcPush(space); // share with other devices
+}
+
+function loadSpace(code) {
+  const raw = localStorage.getItem(GC_PREFIX + code);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function broadcastUpdate(code) {
+  if (syncChannel) {
+    syncChannel.postMessage({ type: "STATE_UPDATE", spaceCode: code, timestamp: Date.now() });
+  }
+}
+
+function saveSession(session) {
+  sessionStorage.setItem(GC_SESSION, JSON.stringify(session));
+  currentSession = session;
+}
+
+function loadSession() {
+  const raw = sessionStorage.getItem(GC_SESSION);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function updateRecentSpaces(code, name, role) {
+  let recent = JSON.parse(localStorage.getItem(GC_RECENT) || "[]");
+  recent = recent.filter(r => r.code !== code);
+  recent.unshift({ code, name, role, lastVisited: Date.now() });
+  if (recent.length > 5) recent = recent.slice(0, 5);
+  localStorage.setItem(GC_RECENT, JSON.stringify(recent));
+}
+
+function getRecentSpaces() {
+  return JSON.parse(localStorage.getItem(GC_RECENT) || "[]");
+}
+
+// =========================================================================
+// CLOUD SYNC (Firebase Realtime Database — free Spark plan)
+// Paste your own config below. Until you do, the app runs in "Local only"
+// mode (same browser/device), exactly like before.
+// =========================================================================
+const GC_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBlXcdndRwXMF_23sGapicD-7QQxQFCXSk",
+  authDomain: "gathercart-9736f.firebaseapp.com",
+  databaseURL: "https://gathercart-9736f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "gathercart-9736f",
+  appId: "1:82594627963:web:387bc57fcfb36c4870bdde"
+};
+
+const GC_COLLECTIONS = ["members", "items", "customRestaurants"];
+let gcDb = null;
+let gcEnabled = false;
+let gcWatchRef = null;
+let gcWatchCb = null;
+let gcConnRef = null;
+let gcConnCb = null;
+const gcSynced = {}; // spaceCode -> last known cloud-shaped snapshot
+
+(function gcInit() {
+  try {
+    const cfg = GC_FIREBASE_CONFIG;
+    const placeholder = /YOUR-PROJECT|PASTE_YOUR/.test(JSON.stringify(cfg));
+    if (typeof firebase === "undefined" || placeholder) return;
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    gcDb = firebase.database();
+    gcEnabled = true;
+  } catch (e) {
+    console.warn("Cloud sync disabled:", e);
+    gcEnabled = false;
+  }
+})();
+
+// ---- helpers -----------------------------------------------------------
+const gcKey = (id) => String(id).replace(/[.#$\[\]\/]/g, "_");
+
+function gcStable(v) {
+  if (Array.isArray(v)) return "[" + v.map(gcStable).join(",") + "]";
+  if (v && typeof v === "object") {
+    return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + gcStable(v[k])).join(",") + "}";
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+// App shape (arrays) -> cloud shape (id-keyed maps, so two people editing
+// different items never overwrite each other).
+function gcToCloud(space) {
+  const s = JSON.parse(JSON.stringify(space)); // drops undefined
+  const out = {};
+  Object.keys(s).forEach(k => {
+    if (GC_COLLECTIONS.includes(k)) {
+      const m = {};
+      (s[k] || []).forEach(o => { if (o && o.id != null) m[gcKey(o.id)] = o; });
+      out[k] = m;
+    } else {
+      out[k] = s[k] === undefined ? null : s[k];
+    }
+  });
+  GC_COLLECTIONS.forEach(k => { if (!out[k]) out[k] = {}; });
+  return out;
+}
+
+// Cloud shape -> app shape. (Realtime DB drops empty arrays/nulls, so refill.)
+function gcFromCloud(v) {
+  const s = Object.assign({}, v);
+  GC_COLLECTIONS.forEach(k => { s[k] = Object.values((v && v[k]) || {}); });
+  s.members.sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+  s.items.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+  if (s.lockedAt === undefined) s.lockedAt = null;
+  if (s.selectedRestaurantId === undefined) s.selectedRestaurantId = null;
+  s.customRestaurants.forEach(r => {
+    if (!r.menu) r.menu = [];
+    if (!r.categories) r.categories = [];
+  });
+  return s;
+}
+
+function gcError(e) {
+  console.error("Cloud sync error:", e);
+  if (typeof showToast === "function") showToast("Sync problem — check your internet connection.", "error");
+}
+
+// ---- push only what changed --------------------------------------------
+function gcPush(space) {
+  if (!gcEnabled || !space) return;
+  const code = space.code;
+  const next = gcToCloud(space);
+  const prev = gcSynced[code];
+  const ref = gcDb.ref("spaces/" + code);
+  gcSynced[code] = next;
+
+  if (!prev) { ref.set(next).catch(gcError); return; } // brand-new space
+
+  const upd = {};
+  new Set([...Object.keys(prev), ...Object.keys(next)]).forEach(k => {
+    if (GC_COLLECTIONS.includes(k)) {
+      const a = prev[k] || {}, b = next[k] || {};
+      new Set([...Object.keys(a), ...Object.keys(b)]).forEach(id => {
+        if (!(id in b)) upd[k + "/" + id] = null;
+        else if (!(id in a) || gcStable(a[id]) !== gcStable(b[id])) upd[k + "/" + id] = b[id];
+      });
+    } else if (gcStable(prev[k]) !== gcStable(next[k])) {
+      upd[k] = next[k] === undefined ? null : next[k];
+    }
+  });
+  if (Object.keys(upd).length) ref.update(upd).catch(gcError);
+}
+
+// ---- read once (join / rejoin) -----------------------------------------
+async function fetchSpace(code) {
+  if (!gcEnabled) return loadSpace(code);
+  const snap = await Promise.race([
+    gcDb.ref("spaces/" + code).once("value"),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 9000))
+  ]);
+  const v = snap.val();
+  if (!v) return null;
+  const space = gcFromCloud(v);
+  gcSynced[code] = gcToCloud(space);
+  return space;
+}
+
+// ---- live updates ------------------------------------------------------
+function gcSetStatus(online) {
+  const dot = document.getElementById("sync-dot");
+  const label = document.getElementById("sync-label");
+  if (!label) return;
+  if (!gcEnabled) {
+    label.textContent = "Local only";
+    label.className = "text-xs text-slate-400 font-semibold";
+    if (dot) dot.style.background = "#94a3b8";
+    return;
+  }
+  label.textContent = online ? "Live" : "Reconnecting…";
+  label.className = "text-xs font-semibold " + (online ? "text-green-600" : "text-amber-500");
+  if (dot) dot.style.background = online ? "" : "#f59e0b";
+}
+
+function gcWatch(code) {
+  gcUnwatch();
+  if (!gcEnabled) return;
+  gcWatchRef = gcDb.ref("spaces/" + code);
+  gcWatchCb = gcWatchRef.on("value", (snap) => {
+    const v = snap.val();
+    if (!v) {
+      if (currentSession && currentSession.spaceCode === code) {
+        showToast("This space no longer exists.", "error");
+        leaveRoom();
+      }
+      return;
+    }
+    const fresh = gcFromCloud(v);
+    const incoming = gcToCloud(fresh);
+    gcSynced[code] = incoming;
+    if (currentSpace && gcStable(gcToCloud(currentSpace)) === gcStable(incoming)) return; // our own echo
+    currentSpace = fresh;
+    try { localStorage.setItem(GC_PREFIX + code, JSON.stringify(fresh)); } catch (e) {}
+    renderRoom();
+  }, gcError);
+
+  gcConnRef = gcDb.ref(".info/connected");
+  gcConnCb = gcConnRef.on("value", (s) => gcSetStatus(!!s.val()));
+}
+
+function gcUnwatch() {
+  if (gcWatchRef && gcWatchCb) gcWatchRef.off("value", gcWatchCb);
+  if (gcConnRef && gcConnCb) gcConnRef.off("value", gcConnCb);
+  gcWatchRef = gcWatchCb = gcConnRef = gcConnCb = null;
+}
+
+
+// =========================================================================
+// 6. LANDING VIEW
+// =========================================================================
+function switchLandingTab(tab) {
+  const isCreate = tab === "create";
+  document.getElementById("tab-create").className = `flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${isCreate ? "tab-active" : "text-slate-500"}`;
+  document.getElementById("tab-join").className = `flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${!isCreate ? "tab-active" : "text-slate-500"}`;
+  document.getElementById("form-create").classList.toggle("hidden", !isCreate);
+  document.getElementById("form-join").classList.toggle("hidden", isCreate);
+}
+
+function renderRecentSpaces() {
+  const recent = getRecentSpaces();
+  const section = document.getElementById("recent-spaces-section");
+  const list = document.getElementById("recent-spaces-list");
+  if (!recent.length) { section.classList.add("hidden"); return; }
+  section.classList.remove("hidden");
+  list.innerHTML = recent.map(r => `
+    <div class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-all"
+         onclick="rejoinSpace('${r.code}', '${r.role}')">
+      <div class="w-8 h-8 rounded-full brand-gradient flex items-center justify-center text-white font-bold text-xs">${r.role === "host" ? "👑" : "👤"}</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-slate-800 truncate">${escHtml(r.name)}</div>
+        <div class="text-xs text-slate-400">${r.role === "host" ? "Host" : "Member"} · <span class="font-mono tracking-wider">${r.code}</span></div>
+      </div>
+      <svg class="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </div>`).join("");
+}
+
+async function rejoinSpace(code, role) {
+  let space;
+  try { space = await fetchSpace(code); }
+  catch (e) { showToast("Couldn't reach the server. Check your internet.", "error"); return; }
+  if (!space) { showToast("Space not found. It may have expired.", "error"); return; }
+  const existing = loadSession();
+  if (existing && existing.spaceCode === code) {
+    enterRoom(space, existing);
+    return;
+  }
+  switchLandingTab("join");
+  document.getElementById("inp-join-code").value = code;
+  document.getElementById("inp-join-name").focus();
+}
+
+function createSpace() {
+  const name = document.getElementById("inp-space-name").value.trim();
+  const hostName = document.getElementById("inp-host-name").value.trim();
+  if (!name) { showToast("Please enter a space name.", "error"); return; }
+  if (!hostName) { showToast("Please enter your name.", "error"); return; }
+
+  const code = genSpaceCode();
+  const hostId = genId();
+  const hostColor = MEMBER_COLORS[0];
+
+  const space = {
+    code,
+    name,
+    hostId,
+    currency: "₹",
+    createdAt: Date.now(),
+    lockedAt: null,
+    selectedRestaurantId: null,
+    customRestaurants: [],
+    members: [{ id: hostId, name: hostName, role: "host", joinedAt: Date.now(), color: hostColor }],
+    items: []
+  };
+
+  saveSpace(space);
+  const session = { spaceCode: code, memberId: hostId, memberName: hostName, role: "host" };
+  saveSession(session);
+  broadcastUpdate(code);
+  enterRoom(space, session);
+}
+
+async function joinSpace() {
+  const rawCode = document.getElementById("inp-join-code").value.trim().toUpperCase();
+  const memberName = document.getElementById("inp-join-name").value.trim();
+  if (!rawCode || rawCode.length !== 6) { showToast("Please enter a valid 6-character code.", "error"); return; }
+  if (!memberName) { showToast("Please enter your name.", "error"); return; }
+
+  let space;
+  try { space = await fetchSpace(rawCode); }
+  catch (e) { showToast("Couldn't reach the server. Check your internet and try again.", "error"); return; }
+  if (!space) { showToast("Space not found. Check the code and try again.", "error"); return; }
+
+  if (space.lockedAt) { showToast("This cart is locked by the host.", "error"); return; }
+
+  const memberId = genId();
+  const colorIdx = space.members.length % MEMBER_COLORS.length;
+  const memberColor = MEMBER_COLORS[colorIdx];
+
+  space.members.push({ id: memberId, name: memberName, role: "member", joinedAt: Date.now(), color: memberColor });
+  saveSpace(space);
+
+  const session = { spaceCode: rawCode, memberId, memberName, role: "member" };
+  saveSession(session);
+  broadcastUpdate(rawCode);
+  enterRoom(space, session);
+}
+
+// =========================================================================
+// 7. ROOM ENTRY & STATE RELOAD
+// =========================================================================
+function enterRoom(space, session) {
+  currentSpace = space;
+  currentSession = session;
+  gcWatch(space.code);
+  document.getElementById("view-landing").classList.add("hidden");
+  document.getElementById("view-room").classList.remove("hidden");
+  renderRoom();
+  updateInviteLinks();
+}
+
+function reloadSpaceFromStorage() {
+  if (!currentSession) return;
+  const fresh = loadSpace(currentSession.spaceCode);
+  if (!fresh) return;
+  currentSpace = fresh;
+  renderRoom();
+}
+
+function renderRoom() {
+  const space = currentSpace;
+  const session = currentSession;
+  if (!space || !session) return;
+
+  document.getElementById("room-title").textContent = space.name;
+  document.getElementById("room-code-display").textContent = space.code;
+
+  renderMembers();
+  renderRestaurantPanel();
+  renderMenuPanel();
+  renderCart();
+  updateHostControls();
+  updateInviteLinks();
+}
+
+function renderMembers() {
+  const space = currentSpace;
+  const list = document.getElementById("members-list");
+  const countBadge = document.getElementById("member-count-badge");
+  countBadge.textContent = `${space.members.length} member${space.members.length !== 1 ? "s" : ""}`;
+  list.innerHTML = space.members.map(m => `
+    <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold border"
+         style="background:${m.color}18; color:${m.color}; border-color:${m.color}44;">
+      ${m.role === "host" ? "👑" : "👤"} ${escHtml(m.name)}
+    </div>`).join("");
+}
+
+// =========================================================================
+// 8. RESTAURANT PANEL
+// =========================================================================
+function renderRestaurantPanel() {
+  const space = currentSpace;
+  const session = currentSession;
+  const isHost = session.role === "host";
+
+  document.getElementById("host-only-badge").classList.toggle("hidden", !isHost);
+  document.getElementById("scan-upload-menu-btn").classList.toggle("hidden", !isHost);
+  document.getElementById("restaurant-selector-host").classList.toggle("hidden", !isHost);
+  document.getElementById("restaurant-banner-member").classList.toggle("hidden", isHost);
+
+  const allRests = getAllRestaurants(space);
+  const selectedRest = space.selectedRestaurantId
+    ? allRests.find(r => r.id === space.selectedRestaurantId)
+    : null;
+
+  if (isHost) {
+    document.getElementById("restaurant-none-msg").classList.add("hidden");
+    renderRestaurantCards(selectedRest, allRests);
+    document.getElementById("change-restaurant-btn").classList.toggle("hidden", !selectedRest);
+  } else {
+    if (selectedRest) {
+      document.getElementById("restaurant-none-msg").classList.add("hidden");
+      document.getElementById("restaurant-banner-member").classList.remove("hidden");
+      document.getElementById("member-restaurant-emoji").textContent = selectedRest.emoji || "📋";
+      document.getElementById("member-restaurant-name").textContent = selectedRest.name;
+      document.getElementById("member-restaurant-cuisine").textContent = selectedRest.cuisine || "Menu";
+    } else {
+      document.getElementById("restaurant-banner-member").classList.add("hidden");
+      document.getElementById("restaurant-none-msg").classList.remove("hidden");
+      document.getElementById("restaurant-none-msg").textContent = "Waiting for host to select a restaurant…";
+    }
+  }
+}
+
+function renderRestaurantCards(selectedRest, allRests) {
+  const grid = document.getElementById("restaurant-cards-grid");
+  if (selectedRest) {
+    const isScanned = !!selectedRest.isCustomMenu;
+    grid.innerHTML = `
+      <div class="restaurant-card selected col-span-full flex items-center gap-3 p-3 cursor-default" style="border-color:${selectedRest.color || "#F97316"};">
+        <span class="text-3xl">${selectedRest.emoji || "📋"}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-slate-800 text-sm truncate">${escHtml(selectedRest.name)}</span>
+            ${isScanned ? `<span class="text-[10px] bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">Uploaded Menu</span>` : ""}
+          </div>
+          <div class="text-xs text-slate-500">${escHtml(selectedRest.cuisine || "Custom Menu")} · ${selectedRest.menu.length} items</div>
+          ${!isScanned ? `
+          <div class="flex items-center gap-2 mt-0.5">
+            ${starRating(selectedRest.rating)}
+            <span class="text-slate-400 text-xs">·</span>
+            <span class="text-xs text-slate-500">${escHtml(selectedRest.deliveryTime)}</span>
+          </div>` : ""}
+        </div>
+        <span class="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full border border-green-200">✓ Selected</span>
+      </div>`;
+  } else {
+    grid.innerHTML = allRests.map(r => {
+      const isScanned = !!r.isCustomMenu;
+      return `
+      <div class="restaurant-card p-3 flex flex-col gap-2 relative" onclick="selectRestaurant('${r.id}')">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">${r.emoji || "📋"}</span>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-slate-800 text-xs leading-tight truncate">${escHtml(r.name)}</div>
+            <div class="text-xs text-slate-400 truncate">${escHtml(r.cuisine || "Custom Menu")}</div>
+          </div>
+          ${isScanned ? `<span class="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 font-semibold px-1.5 py-0.5 rounded-md">Scanned</span>` : ""}
+        </div>
+        ${isScanned ? `
+          <div class="flex items-center justify-between text-xs text-slate-500">
+            <span>${r.menu.length} item${r.menu.length !== 1 ? "s" : ""}</span>
+            <button onclick="event.stopPropagation(); deleteSavedScannedMenu('${r.id}')" class="text-red-400 hover:text-red-600 text-[11px] font-semibold">Remove</button>
+          </div>
+        ` : `
+          <div class="flex items-center justify-between">
+            ${starRating(r.rating)}
+            <span class="text-xs text-slate-400">${escHtml(r.deliveryTime)}</span>
+          </div>
+          <div class="text-xs text-slate-400">Min. order: ${fmt(r.minOrder)}</div>
+        `}
+      </div>`;
+    }).join("");
+  }
+}
+
+function deleteSavedScannedMenu(id) {
+  const saved = getSavedCustomRestaurants().filter(r => r.id !== id);
+  localStorage.setItem(GC_SAVED_MENUS, JSON.stringify(saved));
+  if (currentSpace && Array.isArray(currentSpace.customRestaurants)) {
+    currentSpace.customRestaurants = currentSpace.customRestaurants.filter(r => r.id !== id);
+    saveAndBroadcast();
+  }
+  renderRoom();
+  showToast("Saved menu removed.", "info");
+}
+
+function selectRestaurant(id) {
+  if (currentSession.role !== "host") return;
+  const space = currentSpace;
+  const hasMenuItems = space.items.some(i => i.type === "menu");
+  if (hasMenuItems && space.selectedRestaurantId && space.selectedRestaurantId !== id) {
+    showConfirmModal(
+      "🍽️",
+      "Change Restaurant?",
+      "Changing the restaurant will remove all current menu items from the cart. Custom items will be kept.",
+      () => {
+        space.items = space.items.filter(i => i.type !== "menu");
+        ensureRestaurantInSpace(space, id);
+        space.selectedRestaurantId = id;
+        saveAndBroadcast();
+        menuItemQtyMap = {};
+        renderRoom();
+        showToast("Restaurant changed!", "success");
+      }
+    );
+  } else {
+    ensureRestaurantInSpace(space, id);
+    space.selectedRestaurantId = id;
+    saveAndBroadcast();
+    menuItemQtyMap = {};
+    renderRoom();
+    showToast("Restaurant selected!", "success");
+  }
+}
+
+function changeRestaurant() {
+  if (currentSession.role !== "host") return;
+  const space = currentSpace;
+  const hasMenuItems = space.items.some(i => i.type === "menu");
+  if (hasMenuItems) {
+    showConfirmModal(
+      "🍽️",
+      "Change Restaurant?",
+      "This will remove all menu items from the cart. Custom items will be kept.",
+      () => {
+        space.items = space.items.filter(i => i.type !== "menu");
+        space.selectedRestaurantId = null;
+        saveAndBroadcast();
+        menuItemQtyMap = {};
+        renderRoom();
+        showToast("Restaurant cleared.", "info");
+      }
+    );
+  } else {
+    space.selectedRestaurantId = null;
+    saveAndBroadcast();
+    menuItemQtyMap = {};
+    renderRoom();
+  }
+}
+
+// =========================================================================
+// 9. MENU PANEL
+// =========================================================================
+function renderMenuPanel() {
+  const space = currentSpace;
+  const panel = document.getElementById("menu-panel");
+  if (!space.selectedRestaurantId) { panel.classList.add("hidden"); return; }
+  const rest = getAllRestaurants(space).find(r => r.id === space.selectedRestaurantId);
+  if (!rest) { panel.classList.add("hidden"); return; }
+
+  panel.classList.remove("hidden");
+  document.getElementById("menu-restaurant-label").textContent = rest.name;
+
+  if (!activeMenuCategory || !rest.categories.includes(activeMenuCategory)) {
+    activeMenuCategory = rest.categories[0];
+  }
+
+  // Category tabs with item counts
+  const catTabs = document.getElementById("menu-category-tabs");
+  catTabs.innerHTML = rest.categories.map(cat => {
+    const count = rest.menu.filter(i => i.category === cat).length;
+    const active = cat === activeMenuCategory;
+    return `<button onclick="setMenuCategory('${escAttr(cat)}')"
+      class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${active ? "pill-active border-orange-500" : "bg-white border-slate-200 text-slate-600 hover:border-orange-300"}">
+      ${escHtml(cat)} <span class="ml-1 opacity-70">${count}</span>
+    </button>`;
+  }).join("");
+
+  // Items grid
+  const items = rest.menu.filter(i => i.category === activeMenuCategory);
+  const isLocked = !!space.lockedAt;
+  const grid = document.getElementById("menu-items-grid");
+  grid.innerHTML = items.map(item => {
+    const qty = menuItemQtyMap[item.id] || 0;
+    const showStepper = qty > 0;
+    return `
+    <div class="menu-item-card relative border border-slate-200 rounded-xl p-3 bg-white ${isLocked ? "opacity-70" : ""}">
+      ${isLocked ? `<div class="locked-overlay"><span class="text-xs font-semibold text-slate-500">🔒 Locked</span></div>` : ""}
+      <div class="flex gap-3 items-start">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 mb-0.5">
+            <div class="veg-dot ${item.veg ? "veg" : "nonveg"}"></div>
+            ${item.bestseller ? `<span class="text-xs font-bold text-orange-500">★ Bestseller</span>` : ""}
+          </div>
+          <div class="font-semibold text-slate-800 text-sm leading-snug">${escHtml(item.name)}</div>
+          ${item.desc ? `<div class="text-xs text-slate-400 mt-0.5 leading-snug line-clamp-2">${escHtml(item.desc)}</div>` : ""}
+          <div class="font-bold text-orange-600 text-sm mt-1">${fmt(item.price)}</div>
+        </div>
+        <div class="flex-shrink-0">
+          ${showStepper ? `
+            <div class="flex flex-col items-center gap-1">
+              <div class="flex items-center gap-1 border border-orange-200 rounded-xl overflow-hidden">
+                <button onclick="adjustMenuQty('${item.id}', -1)" class="qty-btn bg-orange-50 hover:bg-orange-100 text-orange-600">−</button>
+                <span class="text-sm font-bold text-slate-800 w-7 text-center">${qty}</span>
+                <button onclick="adjustMenuQty('${item.id}', 1)" class="qty-btn bg-orange-50 hover:bg-orange-100 text-orange-600">+</button>
+              </div>
+              <button onclick="addMenuItemToCart('${item.id}')" class="btn-brand text-xs px-3 py-1.5 w-full">Add to Cart</button>
+            </div>
+          ` : `
+            <button onclick="adjustMenuQty('${item.id}', 1)" ${isLocked ? "disabled" : ""} class="btn-brand text-xs px-3 py-2">+ Add</button>
+          `}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function setMenuCategory(cat) {
+  activeMenuCategory = cat;
+  renderMenuPanel();
+}
+
+function adjustMenuQty(itemId, delta) {
+  const space = currentSpace;
+  if (space.lockedAt) { showToast("Cart is locked by host.", "error"); return; }
+  menuItemQtyMap[itemId] = Math.max(0, (menuItemQtyMap[itemId] || 0) + delta);
+  renderMenuPanel();
+}
+
+function addMenuItemToCart(itemId) {
+  const space = currentSpace;
+  if (space.lockedAt) { showToast("Cart is locked by host.", "error"); return; }
+  const qty = menuItemQtyMap[itemId] || 1;
+  if (qty < 1) return;
+
+  const rest = getAllRestaurants(space).find(r => r.id === space.selectedRestaurantId);
+  if (!rest) return;
+  const menuItem = rest.menu.find(i => i.id === itemId);
+  if (!menuItem) return;
+
+  const member = space.members.find(m => m.id === currentSession.memberId);
+  const cartItem = {
+    id: genId(),
+    memberId: currentSession.memberId,
+    memberName: currentSession.memberName,
+    memberColor: member ? member.color : MEMBER_COLORS[0],
+    type: "menu",
+    restaurantId: space.selectedRestaurantId,
+    name: menuItem.name,
+    desc: menuItem.desc || "",
+    qty,
+    unitPrice: menuItem.price,
+    note: "",
+    addedAt: Date.now()
+  };
+
+  space.items.push(cartItem);
+  saveAndBroadcast();
+  menuItemQtyMap[itemId] = 0;
+  renderRoom();
+  showToast(`${menuItem.name} added to cart!`, "success");
+}
+
+// =========================================================================
+// 9B. SCAN OR UPLOAD MENU FEATURE
+// =========================================================================
+function openMenuScannerModal() {
+  if (!currentSession || currentSession.role !== "host") {
+    showToast("Only the host can scan or upload menus.", "error");
+    return;
+  }
+  scannerItems = [];
+  document.getElementById("scanned-rest-name").value = "";
+  document.getElementById("scanned-rest-cuisine").value = "Scanned Menu";
+  document.getElementById("menu-paste-textarea").value = "";
+  document.getElementById("raw-ocr-textarea").value = "";
+  document.getElementById("menu-ocr-status").classList.add("hidden");
+  document.getElementById("menu-image-preview-col").classList.add("hidden");
+  document.getElementById("menu-items-editor-col").className = "md:col-span-12 space-y-3";
+  document.getElementById("raw-ocr-box").classList.add("hidden");
+  switchScannerTab("upload");
+  renderScannedItemsEditor();
+  document.getElementById("menu-scanner-modal").classList.remove("hidden");
+}
+
+function closeMenuScannerModal(e) {
+  if (!e || e.target === document.getElementById("menu-scanner-modal")) {
+    stopMenuCamera();
+    document.getElementById("menu-scanner-modal").classList.add("hidden");
+  }
+}
+
+function switchScannerTab(tab) {
+  const tabs = ["upload", "camera", "paste"];
+  tabs.forEach(t => {
+    const active = t === tab;
+    document.getElementById(`scan-tab-${t}`).className =
+      `flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${active ? "tab-active" : "text-slate-500"}`;
+    document.getElementById(`scan-panel-${t}`).classList.toggle("hidden", !active);
+  });
+  if (tab !== "camera") {
+    stopMenuCamera();
+  }
+}
+
+function handleMenuDragOver(e) {
+  e.preventDefault();
+  document.getElementById("menu-dropzone").classList.add("dragover");
+}
+
+function handleMenuDragLeave(e) {
+  e.preventDefault();
+  document.getElementById("menu-dropzone").classList.remove("dragover");
+}
+
+function handleMenuDrop(e) {
+  e.preventDefault();
+  document.getElementById("menu-dropzone").classList.remove("dragover");
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) processUploadedMenuFile(file);
+}
+
+function handleMenuFileSelect(e) {
+  const file = e.target && e.target.files && e.target.files[0];
+  if (file) {
+    processUploadedMenuFile(file);
+    e.target.value = "";
+  }
+}
+
+async function startMenuCamera() {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast("Live camera not supported in this browser. Use 'Use Device Camera App'.", "info");
+      return;
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    const video = document.getElementById("menu-camera-video");
+    video.srcObject = cameraStream;
+    video.classList.remove("hidden");
+    document.getElementById("camera-placeholder").classList.add("hidden");
+    document.getElementById("camera-controls").classList.remove("hidden");
+  } catch (err) {
+    showToast("Camera permission denied or unavailable. You can upload a photo instead.", "error");
+  }
+}
+
+function stopMenuCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  const video = document.getElementById("menu-camera-video");
+  if (video) {
+    video.srcObject = null;
+    video.classList.add("hidden");
+  }
+  const ph = document.getElementById("camera-placeholder");
+  const ctrl = document.getElementById("camera-controls");
+  if (ph) ph.classList.remove("hidden");
+  if (ctrl) ctrl.classList.add("hidden");
+}
+
+function captureMenuPhoto() {
+  const video = document.getElementById("menu-camera-video");
+  if (!video || !video.videoWidth || !video.videoHeight) {
+    showToast("Camera is not ready yet. Wait until the preview appears, then capture.", "info");
+    return;
+  }
+  const canvas = document.getElementById("menu-capture-canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  stopMenuCamera();
+  showMenuPreviewImage(dataUrl);
+  runImageMenuOCR(dataUrl);
+}
+
+function showMenuPreviewImage(dataUrl) {
+  document.getElementById("menu-preview-img").src = dataUrl;
+  document.getElementById("menu-image-preview-col").classList.remove("hidden");
+  document.getElementById("menu-items-editor-col").className = "md:col-span-8 space-y-3";
+}
+
+function setOcrProgress(visible, text = "", pct = 0) {
+  const box = document.getElementById("menu-ocr-status");
+  if (!visible) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  document.getElementById("menu-ocr-status-text").textContent = text;
+  document.getElementById("menu-ocr-status-pct").textContent = `${Math.round(pct)}%`;
+  document.getElementById("menu-ocr-progress-bar").style.width = `${Math.max(5, Math.min(100, pct))}%`;
+}
+
+function loadTesseractLib() {
+  if (window.Tesseract && typeof window.Tesseract.createWorker === "function") {
+    return Promise.resolve(window.Tesseract);
+  }
+  if (tesseractPromise) return tesseractPromise;
+
+  tesseractPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-gathercart-tesseract="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => {
+        if (window.Tesseract) resolve(window.Tesseract);
+        else reject(new Error("Tesseract loaded but its API was not found."));
+      }, { once: true });
+      existing.addEventListener("error", () => reject(new Error("Could not download Tesseract.js.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.dataset.gathercartTesseract = "true";
+    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    script.async = true;
+    script.onload = () => {
+      if (window.Tesseract && typeof window.Tesseract.createWorker === "function") {
+        resolve(window.Tesseract);
+      } else {
+        reject(new Error("Tesseract.js loaded, but createWorker is unavailable."));
+      }
+    };
+    script.onerror = () => reject(new Error("Could not download Tesseract.js. Check your internet connection or CDN access."));
+    document.head.appendChild(script);
+  }).catch(err => {
+    // Do not leave a rejected promise cached; the user can retry after a network failure.
+    tesseractPromise = null;
+    throw err;
+  });
+
+  return tesseractPromise;
+}
+function loadPdfJsLib() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfjsPromise) return pdfjsPromise;
+  pdfjsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => {
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      } else {
+        reject(new Error("PDF library failed to initialize."));
+      }
+    };
+    s.onerror = () => reject(new Error("PDF reader could not be loaded."));
+    document.head.appendChild(s);
+  });
+  return pdfjsPromise;
+}
+
+async function processUploadedMenuFile(file) {
+  const fileNameNoExt = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
+  if (!document.getElementById("scanned-rest-name").value.trim() && fileNameNoExt) {
+    document.getElementById("scanned-rest-name").value = fileNameNoExt.slice(0, 45);
+  }
+
+  const lower = file.name.toLowerCase();
+
+  // 1. JSON Menu
+  if (lower.endsWith(".json") || file.type === "application/json") {
+    const text = await file.text();
+    try {
+      const data = JSON.parse(text);
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.menu) ? data.menu : []);
+      if (data.name && !document.getElementById("scanned-rest-name").value.trim()) {
+        document.getElementById("scanned-rest-name").value = String(data.name).slice(0, 45);
+      }
+      scannerItems = arr.map((it, idx) => ({
+        id: genId(),
+        name: String(it.name || it.item || `Item ${idx + 1}`).trim(),
+        category: String(it.category || "Menu").trim() || "Menu",
+        price: Math.max(0, parseFloat(it.price) || 0),
+        desc: String(it.desc || it.description || "").trim(),
+        veg: typeof it.veg === "boolean" ? it.veg : inferVegFromName(String(it.name || ""))
+      })).filter(it => it.name);
+      renderScannedItemsEditor();
+      showToast(`Imported ${scannerItems.length} items from JSON!`, "success");
+    } catch {
+      showToast("Invalid JSON menu file.", "error");
+    }
+    return;
+  }
+
+  // 2. TXT or CSV Menu
+  if (lower.endsWith(".txt") || lower.endsWith(".csv") || file.type.startsWith("text/")) {
+    const text = await file.text();
+    document.getElementById("raw-ocr-textarea").value = text;
+    applyParsedMenuFromText(text);
+    showToast(`Extracted ${scannerItems.length} items from file!`, "success");
+    return;
+  }
+
+  // 3. PDF Menu
+  if (lower.endsWith(".pdf") || file.type === "application/pdf") {
+    setOcrProgress(true, "Reading PDF menu...", 15);
+    try {
+      const pdfjsLib = await loadPdfJsLib();
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      const maxPages = Math.min(pdf.numPages, 6);
+      for (let p = 1; p <= maxPages; p++) {
+        setOcrProgress(true, `Reading PDF page ${p} of ${maxPages}...`, 15 + (p / maxPages) * 55);
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        // Group items by Y coordinate to preserve lines
+        const rows = [];
+        content.items.forEach(item => {
+          const str = item.str.trim();
+          if (!str) return;
+          const y = Math.round(item.transform[5] / 6) * 6;
+          let row = rows.find(r => Math.abs(r.y - y) <= 4);
+          if (!row) {
+            row = { y, parts: [] };
+            rows.push(row);
+          }
+          row.parts.push({ x: item.transform[4], str });
+        });
+        rows.sort((a, b) => b.y - a.y);
+        const pageLines = rows.map(r => r.parts.sort((a, b) => a.x - b.x).map(p => p.str).join(" "));
+        fullText += pageLines.join("\n") + "\n";
+      }
+
+      if (fullText.trim().length > 25) {
+        setOcrProgress(false);
+        document.getElementById("raw-ocr-textarea").value = fullText.trim();
+        applyParsedMenuFromText(fullText);
+        showToast(`Extracted ${scannerItems.length} items from PDF!`, "success");
+      } else {
+        // Scanned image-only PDF: render page 1 to canvas and OCR it
+        setOcrProgress(true, "Scanned PDF detected — running OCR on page 1...", 40);
+        const page1 = await pdf.getPage(1);
+        const viewport = page1.getViewport({ scale: 2.0 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page1.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+        const dataUrl = canvas.toDataURL("image/png");
+        showMenuPreviewImage(dataUrl);
+        await runImageMenuOCR(dataUrl);
+      }
+    } catch (err) {
+      setOcrProgress(false);
+      showToast("Could not automatically parse PDF. You can paste text or add items below.", "error");
+    }
+    return;
+  }
+
+  // 4. Image Menu (JPG, PNG, WEBP, etc.)
+  if (file.type.startsWith("image/") || /\.(jpe?g|png|webp|bmp|gif)$/i.test(lower)) {
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const dataUrl = ev.target.result;
+        showMenuPreviewImage(dataUrl);
+        await runImageMenuOCR(dataUrl);
+      } catch (err) {
+        console.error("Menu image read error:", err);
+        showToast("Could not read this image. Try another JPG or PNG file.", "error");
+      }
+    };
+    reader.onerror = () => showToast("The browser could not read this image file.", "error");
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  showToast("Unsupported file format. Please upload an image, PDF, TXT, CSV, or JSON.", "error");
+}
+
+async function prepareMenuImageForOCR(source) {
+  // Upscale small menu photos and increase contrast before recognition.
+  const image = new Image();
+  image.src = source;
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error("The selected image could not be decoded."));
+  });
+
+  // Small / low-res menu photos need a big upscale for digits to be readable.
+  const scale = Math.min(4, 2400 / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Your browser could not prepare the image for OCR.");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, 0, 0, width, height);
+
+  // Grayscale + mild contrast enhancement; retain color-independent text edges.
+  const pixels = ctx.getImageData(0, 0, width, height);
+  const data = pixels.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const enhanced = Math.max(0, Math.min(255, (gray - 128) * 1.25 + 128));
+    data[i] = data[i + 1] = data[i + 2] = enhanced;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
+// Turns Tesseract output into {items, rawText, suggestedName}. Uses word positions when
+// available (handles columns + Half/Full), otherwise falls back to the plain-text parser.
+function parseOcrResult(data) {
+  let best = { items: [], rawText: String(data?.text || "").trim(), suggestedName: "" };
+  try {
+    const layout = ocrWordsToMenuLayout(extractOcrWords(data));
+    if (layout) {
+      const parsed = parseMenuColumns(layout.columns, { mh: layout.mh, titleName: layout.titleName });
+      best = { items: parsed.items, rawText: menuLayoutToRawText(layout), suggestedName: parsed.suggestedName };
+    }
+  } catch (e) {
+    console.warn("Layout-aware parsing failed, using text parser:", e);
+  }
+  if (best.items.length < 3 && data?.text) {
+    const t = parseMenuTextToItems(data.text);
+    if (t.items.length > best.items.length) best = { items: t.items, rawText: String(data.text).trim(), suggestedName: t.suggestedName };
+  }
+  return best;
+}
+
+async function runImageMenuOCR(imageSource) {
+  setOcrProgress(true, "Preparing menu image...", 5);
+  let worker = null;
+
+  try {
+    if (!imageSource) throw new Error("No image was supplied to the OCR scanner.");
+
+    const Tesseract = await loadTesseractLib();
+    setOcrProgress(true, "Preparing OCR engine...", 12);
+
+    const workerOptions = {
+      logger: (message) => {
+        if (message.status === "recognizing text") {
+          setOcrProgress(true, "Recognizing menu text & prices...", 25 + (message.progress || 0) * 70);
+        } else if (message.status) {
+          setOcrProgress(true, `Loading OCR: ${message.status}...`, 15);
+        }
+      }
+    };
+
+    // Tesseract.js v5 uses createWorker() followed by worker.recognize().
+    worker = await Tesseract.createWorker("eng", 1, workerOptions);
+    const preparedCanvas = await prepareMenuImageForOCR(imageSource);
+
+    setOcrProgress(true, "Reading menu text & prices...", 25);
+
+    // Sparse-text mode (11) reads each word with its position, so we can rebuild
+    // columns ourselves instead of letting side-by-side columns merge into one line.
+    await worker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" });
+    let result = await worker.recognize(preparedCanvas);
+    let parsedOcr = parseOcrResult(result?.data);
+
+    if (parsedOcr.items.length < 3) {
+      setOcrProgress(true, "Trying a second reading mode...", 80);
+      await worker.setParameters({ tessedit_pageseg_mode: "3" });
+      const result2 = await worker.recognize(preparedCanvas);
+      const parsed2 = parseOcrResult(result2?.data);
+      if (parsed2.items.length > parsedOcr.items.length) { parsedOcr = parsed2; result = result2; }
+    }
+
+    const rawText = parsedOcr.rawText;
+    document.getElementById("raw-ocr-textarea").value = rawText;
+
+    if (!rawText) {
+      applyParsedMenuFromText("");
+      showToast("No readable text found. Try a sharper, brighter, straight-on photo.", "error");
+      return;
+    }
+
+    if (parsedOcr.suggestedName && !document.getElementById("scanned-rest-name").value.trim()) {
+      document.getElementById("scanned-rest-name").value = parsedOcr.suggestedName;
+    }
+    scannerItems = parsedOcr.items;
+    renderScannedItemsEditor();
+
+    if (scannerItems.length > 0) {
+      showToast(`Recognized text and found ${scannerItems.length} possible items. Please verify every name and price.`, "success");
+    } else {
+      showToast("Text was recognized, but no item/price pairs were detected. Open 'View / Edit Raw Extracted Text' or add rows manually.", "info");
+      addEmptyScannedItemRow();
+    }
+  } catch (err) {
+    console.error("GatherCart OCR error:", err);
+    const message = err && err.message ? err.message : String(err);
+    showToast(`OCR failed: ${message}`, "error");
+    if (scannerItems.length === 0) addEmptyScannedItemRow();
+  } finally {
+    if (worker) {
+      try { await worker.terminate(); }
+      catch (terminateError) { console.warn("Could not terminate OCR worker:", terminateError); }
+    }
+    setOcrProgress(false);
+  }
+}
+function fillSampleMenuText() {
+  document.getElementById("menu-paste-textarea").value =
+`STARTERS
+Paneer Tikka (6 pcs) - ₹260
+Crispy Chilli Baby Corn - ₹210
+Chicken Lollipop (6 pcs) - ₹280
+
+MAIN COURSE
+Paneer Butter Masala - ₹290
+Butter Chicken - ₹340
+Dal Tadka - ₹210
+Chicken Dum Biryani - ₹330
+
+BREADS & DRINKS
+Butter Naan - ₹75
+Garlic Naan - ₹90
+Fresh Lime Soda - ₹80
+Mango Lassi - ₹110`;
+}
+
+function parsePastedMenuText() {
+  const txt = document.getElementById("menu-paste-textarea").value.trim();
+  if (!txt) {
+    showToast("Please paste some menu text first.", "error");
+    return;
+  }
+  document.getElementById("raw-ocr-textarea").value = txt;
+  applyParsedMenuFromText(txt);
+  showToast(`Extracted ${scannerItems.length} items!`, "success");
+}
+
+function toggleRawOcrBox() {
+  document.getElementById("raw-ocr-box").classList.toggle("hidden");
+}
+
+function reparseRawOcrText() {
+  const txt = document.getElementById("raw-ocr-textarea").value;
+  applyParsedMenuFromText(txt);
+  showToast(`Re-extracted ${scannerItems.length} items.`, "info");
+}
+
+function applyParsedMenuFromText(rawText) {
+  const parsed = parseMenuTextToItems(rawText);
+  if (parsed.suggestedName && !document.getElementById("scanned-rest-name").value.trim()) {
+    document.getElementById("scanned-rest-name").value = parsed.suggestedName;
+  }
+  scannerItems = parsed.items;
+  renderScannedItemsEditor();
+}
+
+function inferVegFromName(name) {
+  const lower = name.toLowerCase();
+  if (/\b(non[\s-]?veg|chicken|mutton|lamb|fish|prawn|shrimp|egg|beef|pork|bacon|pepperoni|tuna|salmon|crab|keema|seekh|wings|ham|salami)\b/i.test(lower)) {
+    return false;
+  }
+  return true;
+}
+
+/* ======================================================================
+   LAYOUT-AWARE MENU PARSER
+   - Works from OCR word boxes (so side-by-side columns are separated)
+   - Detects Half / Full (and Small / Medium / Large ...) price columns
+   - Also works from plain text (paste / TXT / PDF / re-extract)
+   ====================================================================== */
+const MENU_SIZE_WORDS = {
+  half: "Half", full: "Full", small: "Small", sm: "Small", medium: "Medium", med: "Medium",
+  large: "Large", lg: "Large", regular: "Regular", reg: "Regular", mini: "Mini", jumbo: "Jumbo",
+  qtr: "Quarter", quarter: "Quarter"
+};
+const MENU_LABEL_FILLER = new Set(["item", "items", "name", "particulars", "description", "price", "prices",
+  "rate", "rs", "inr", "qty", "quantity", "size", "portion", "dish", "dishes"]);
+const MENU_CATEGORY_WORDS = /^(starters?|appetizers?|soups?|salads?|mains?|main|course|entrees?|pizzas?|burgers?|sandwich(?:es)?|pastas?|noodles?|rice|biryani|biriyani|breads?|roti|naan|sides?|snacks?|chaat|desserts?|sweets?|beverages?|drinks?|juices?|shakes?|coffee|tea|mocktails?|cocktails?|combos?|thali|rolls?|wraps?|momos?|sushi|tacos?|chinese|indian|tandoor|tandoori|kebabs?|kababs?|kabab|veg|non[\s-]?veg|nonveg|vegetarian|non[\s-]?vegetarian|seafood|breakfast|lunch|dinner|specials?|curries|gravy|gravies|ice|cream|creams|extras?|add[\s-]?ons?|fried|continental|italian|mexican|thai|south|north|bengali)$/i;
+
+function menuSizeWord(tok) {
+  const s = String(tok || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (MENU_SIZE_WORDS[s]) return MENU_SIZE_WORDS[s];
+  if (/^ha[l1i]f$/.test(s)) return "Half";
+  if (/^fu[l1i]{1,2}$/.test(s)) return "Full";
+  return null;
+}
+
+function parsePriceToken(tok) {
+  let s = String(tok || "").trim();
+  s = s.replace(/^(?:rs\.?|inr|[₹$€£?]|t(?=\d))+/i, "")
+       .replace(/[\s\/\-.*|(){}\[\]:,;=<>«»~]+$/, "");
+  if (!/^\d{1,5}(?:\.\d{1,2})?$/.test(s)) return null;
+  const v = parseFloat(s);
+  return v > 0 && v < 50000 ? v : null;
+}
+const isJunkToken = (t) => !/[A-Za-z0-9]/.test(t);
+const isCurrencyJunk = (t) => /^(rs\.?|inr|t{1,2}|e|f|z)$/i.test(t);
+
+// Split one line's tokens into name tokens + a trailing run of prices.
+function analyzeMenuLine(tokens) {
+  const t = tokens.filter(x => x !== "");
+  while (t.length && isJunkToken(t[t.length - 1])) t.pop();
+  // stray 1-2 letter garbage after the last price (OCR noise like "100 J")
+  while (t.length > 1 && /^[A-Za-z]{1,2}$/.test(t[t.length - 1]) &&
+         parsePriceToken(t[t.length - 2]) !== null && !isCurrencyJunk(t[t.length - 1])) t.pop();
+  const prices = [];
+  let i = t.length - 1;
+  while (i >= 0) {
+    const v = parsePriceToken(t[i]);
+    if (v !== null) { prices.unshift({ raw: t[i].replace(/[^\d.]/g, ""), value: v }); i--; continue; }
+    if (isJunkToken(t[i]) || (isCurrencyJunk(t[i]) && prices.length)) { i--; continue; }
+    break;
+  }
+  const nameTokens = t.slice(0, i + 1).filter(x => !isJunkToken(x) || x === "&" || x === "/");
+  return { nameTokens, prices };
+}
+
+// A header row such as "Item  Half  Full" -> ["Half","Full"]
+function menuLabelsOf(tokens) {
+  const words = tokens.map(t => t.toLowerCase().replace(/[^a-z0-9]/g, "")).filter(Boolean);
+  if (!words.length || words.length > 8) return null;
+  const sizes = [];
+  let fillers = 0;
+  for (let k = 0; k < words.length; k++) {
+    const sz = menuSizeWord(words[k]);
+    if (sz) sizes.push(sz);
+    else if (MENU_LABEL_FILLER.has(words[k])) fillers++;
+    else return null;
+  }
+  if (!sizes.length) return null;
+  if (sizes.length < 2 && fillers < 1) return null;
+  return sizes;
+}
+
+function menuSizeLabels(n, labels) {
+  if (labels && labels.length === n) return labels;
+  if (labels && labels.length > n) return labels.slice(labels.length - n);
+  if (n === 2) return ["Half", "Full"];
+  if (n === 3) return ["Small", "Medium", "Large"];
+  return Array.from({ length: n }, (_, k) => `Option ${k + 1}`);
+}
+
+function inferVegWithCategory(name, category) {
+  const c = String(category || "");
+  const non = /non[\s-]?veg/i.test(c);
+  const veg = /\bveg/i.test(c.replace(/non[\s-]?veg\w*/ig, ""));
+  if (non && !veg) return false;
+  if (veg && !non) return true;
+  return inferVegFromName(name);
+}
+
+function normalizeHeadingText(text) {
+  const toks = String(text || "").split(/[\s]+|-+/).filter(Boolean)
+    .map(t => /^[VvYy][EeIiUu][CcGgRr]{1,2}[Gg]?$/.test(t.replace(/[^A-Za-z]/g, "")) ? "Veg" : t);
+  return toks.join(" ").replace(/\bnon\s+veg\b/ig, "Non-Veg").trim();
+}
+
+function menuCategoryScore(text) {
+  const words = text.split(/[\s/&,]+/).filter(w => w && !/^(and|of|the|our)$/i.test(w));
+  if (!words.length) return 0;
+  const hit = words.filter(w => MENU_CATEGORY_WORDS.test(w.replace(/[^A-Za-z-]/g, ""))).length;
+  return hit / words.length;
+}
+
+function medianOf(arr) {
+  if (!arr.length) return 0;
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[s.length >> 1];
+}
+
+// columns: Array< Array<{tokens:string[], h?:number, cy?:number}> >
+function parseMenuColumns(columns, opts) {
+  opts = opts || {};
+  const mh = opts.mh || 0;
+  const items = [];
+  let suggestedName = opts.titleName || "";
+
+  columns.forEach((lines, colIdx) => {
+    const info = lines.map(l => {
+      const a = analyzeMenuLine(l.tokens);
+      return Object.assign({}, l, a, {
+        text: l.tokens.join(" ").replace(/\s+/g, " ").trim(),
+        large: !!(mh && l.h && l.h >= mh * 1.4)
+      });
+    });
+    if (!info.length) return;
+
+    // vertical rhythm (only when we have coordinates)
+    const diffs = [];
+    for (let k = 1; k < info.length; k++) {
+      if (info[k].cy != null && info[k - 1].cy != null) diffs.push(info[k].cy - info[k - 1].cy);
+    }
+    const pitch = medianOf(diffs);
+    info.forEach((x, k) => { x.gapBefore = (k > 0 && pitch && x.cy != null) ? x.cy - info[k - 1].cy : 0; });
+
+    // How many prices does a normal row in this column carry?
+    const labelRows = info.map(x => menuLabelsOf(x.tokens)).filter(Boolean);
+    const runs = info.filter(x => x.nameTokens.length && x.prices.length && !x.large).map(x => x.prices.length);
+    const counts = {};
+    runs.forEach(n => { counts[n] = (counts[n] || 0) + 1; });
+    let modeRun = 1, best = 0;
+    Object.keys(counts).forEach(k => { if (counts[k] > best || (counts[k] === best && +k > modeRun)) { best = counts[k]; modeRun = +k; } });
+    let expected = modeRun;
+    if (labelRows.length) {
+      const lc = {};
+      labelRows.forEach(r => { lc[r.length] = (lc[r.length] || 0) + 1; });
+      expected = +Object.keys(lc).sort((a, b) => lc[b] - lc[a])[0];
+    }
+
+    let category = opts.keepCategory || "Menu";
+    let labels = null;
+    let pending = [];
+    let itemsInCol = 0;
+    let lastItem = null, lastItemIdx = -9;
+
+    const emit = (rawName, prices) => {
+      const name = cleanItemName(rawName);
+      if (!/\p{L}{2,}/u.test(name)) return false;
+      const multi = prices.length > 1;
+      const lbls = multi ? menuSizeLabels(prices.length, labels) : null;
+      prices.forEach((p, k) => {
+        const nm = multi ? `${name} (${lbls[k]})` : name;
+        const it = { id: genId(), name: nm, category, price: p.value, desc: "", veg: inferVegWithCategory(name, category) };
+        items.push(it);
+        lastItem = it;
+      });
+      itemsInCol++;
+      return true;
+    };
+
+    for (let idx = 0; idx < info.length; idx++) {
+      const L = info[idx];
+
+      // header row: Item  Half  Full
+      const lab = menuLabelsOf(L.tokens);
+      if (lab) { labels = lab; pending = []; continue; }
+
+      // price-only line => belongs to the name above it
+      if (!L.nameTokens.length && L.prices.length) {
+        if (pending.length) { emit(pending.join(" "), L.prices); lastItemIdx = idx; }
+        pending = [];
+        continue;
+      }
+
+      // item line
+      if (L.nameTokens.length && L.prices.length) {
+        let prices = L.prices.slice();
+        let nameToks = L.nameTokens.slice();
+        // "Chicken 65  65 125" -> the first number is part of the dish name
+        if (prices.length > expected && expected >= 1) {
+          const extra = prices.length - expected;
+          nameToks = nameToks.concat(prices.slice(0, extra).map(p => p.raw));
+          prices = prices.slice(extra);
+        }
+        // big banner text with a number in it (e.g. "Ninety 99") is a title, not a dish
+        if (L.large && itemsInCol === 0) {
+          if (!suggestedName) suggestedName = toTitleCase(L.text);
+          continue;
+        }
+        if (expected >= 2 && nameToks.length > 1 && /^\d$/.test(nameToks[nameToks.length - 1])) nameToks.pop();
+        let name = nameToks.join(" ");
+        if (pending.length) {
+          const ptxt = pending.join(" ");
+          const connector = /[\/&,+-]$/.test(ptxt);
+          if (connector || (ptxt.length >= 20 && nameToks.length <= 2)) name = ptxt + " " + name;
+        }
+        pending = [];
+        if (emit(name, prices)) lastItemIdx = idx;
+        continue;
+      }
+
+      // no price on this line: heading, wrapped name, description or noise
+      const text = L.text.replace(/[:=\-–—|•.]+$/g, "").replace(/^[\*\-•▪▸►]+\s*/, "").trim();
+      const normText = normalizeHeadingText(text);
+      const hasDigit = /\d/.test(text);
+      const words = text.split(/\s+/).filter(Boolean);
+
+      if (text.length >= 3 && !hasDigit && words.length <= 5 && text.length <= 40 && !/\bmenu\b/i.test(text)) {
+        const next = info[idx + 1];
+        const nextPriceOnly = next && !next.nameTokens.length && next.prices.length;
+        if (!nextPriceOnly) {
+          const kw = menuCategoryScore(normText) >= 0.5;
+          const caps = text === text.toUpperCase() && /[A-Z]/.test(text);
+          const connector = /[\/&,+-]$/.test(L.text.trim());
+          const nextShort = next && next.nameTokens.length && next.prices.length && next.nameTokens.length <= 2;
+          const wrapLike = connector || (text.length >= 20 && nextShort);
+          const gapHeading = pitch && L.gapBefore >= pitch * 1.7;
+          const isFirst = idx === 0;
+
+          if (!kw && isFirst && colIdx === 0 && itemsInCol === 0 && !suggestedName && !wrapLike && words.length <= 4) {
+            suggestedName = toTitleCase(text);
+            continue;
+          }
+          if (kw || L.large || (!wrapLike && (gapHeading || (caps && words.length <= 3)))) {
+            if (L.large && !kw && itemsInCol === 0) {
+              if (!suggestedName) suggestedName = toTitleCase(text);
+              continue;
+            }
+            category = toTitleCase(normText);
+            category = category.replace(/Non-veg/g, "Non-Veg");
+            pending = [];
+            continue;
+          }
+        }
+      }
+
+      if (!hasDigit && text.length >= 3 && text.length <= 60) {
+        if (lastItem && idx === lastItemIdx + 1 && !lastItem.desc && text.length > 25 && /[a-z]/.test(text)) {
+          lastItem.desc = text;
+          pending = [];
+        } else if (pending.length && /[\/&,+-]$/.test(pending[pending.length - 1])) {
+          pending.push(text);
+        } else {
+          pending = [text];
+        }
+      } else {
+        pending = [];
+      }
+    }
+  });
+
+  return { suggestedName, items };
+}
+
+/* ---------------- OCR word boxes -> columns of lines ---------------- */
+function clusterWordsIntoLines(words, tol) {
+  const sorted = words.slice().sort((a, b) => a.cy - b.cy);
+  const lines = [];
+  for (const w of sorted) {
+    const last = lines[lines.length - 1];
+    if (last && Math.abs(w.cy - last.cy) <= tol) {
+      last.words.push(w);
+      last.cy = last.words.reduce((s, x) => s + x.cy, 0) / last.words.length;
+    } else {
+      lines.push({ cy: w.cy, words: [w] });
+    }
+  }
+  return lines;
+}
+
+function ocrWordsToMenuLayout(rawWords) {
+  let ws = rawWords.map(w => {
+    const b = w.bbox || {};
+    return { t: String(w.text || "").trim(), x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, conf: (w.confidence == null ? 100 : w.confidence) };
+  }).filter(w => w.t && isFinite(w.x0) && isFinite(w.x1) && isFinite(w.y0) && isFinite(w.y1) &&
+    /[A-Za-z0-9\u20B9&\/]/.test(w.t) && (w.conf >= 20 || (parsePriceToken(w.t) !== null && w.conf >= 15)));
+  ws = ws.filter(w => !(w.t.length === 1 && /[A-Za-z]/.test(w.t) && w.conf < 75) && !(w.t.length <= 2 && w.conf < 50 && parsePriceToken(w.t) === null));
+  if (ws.length < 4) return null;
+
+  ws.forEach(w => { w.cx = (w.x0 + w.x1) / 2; w.cy = (w.y0 + w.y1) / 2; w.h = Math.max(1, w.y1 - w.y0); });
+  const mh = medianOf(ws.map(w => w.h));
+  ws = ws.filter(w => w.h >= mh * 0.4);
+
+  const glines = clusterWordsIntoLines(ws, mh * 0.6);
+  const nLines = glines.length;
+
+  // ---- find vertical white-space gaps that separate columns ----
+  const minX = Math.min(...ws.map(w => w.x0));
+  const maxX = Math.max(...ws.map(w => w.x1));
+  const step = Math.max(1, Math.round(mh / 6));
+  const nb = Math.ceil((maxX - minX) / step) + 2;
+  const cover = new Array(nb).fill(0);
+  glines.forEach(l => {
+    const mark = new Uint8Array(nb);
+    l.words.forEach(w => {
+      const a = Math.floor((w.x0 - minX) / step), b = Math.floor((w.x1 - minX) / step);
+      for (let k = Math.max(0, a); k <= Math.min(nb - 1, b); k++) mark[k] = 1;
+    });
+    for (let k = 0; k < nb; k++) cover[k] += mark[k];
+  });
+  const tol = Math.floor(nLines * 0.08);
+  const minGap = Math.ceil((mh * 1.4) / step);
+  const gaps = [];
+  let s = -1;
+  for (let k = 0; k <= nb; k++) {
+    const isGap = k < nb && cover[k] <= tol;
+    if (isGap && s < 0) s = k;
+    if (!isGap && s >= 0) { gaps.push({ s, e: k - 1 }); s = -1; }
+  }
+  const contentBins = cover.map(c => c > tol);
+  const firstC = contentBins.indexOf(true);
+  const lastC = contentBins.lastIndexOf(true);
+  const inner = gaps.filter(g => g.s > firstC && g.e < lastC && (g.e - g.s + 1) >= minGap);
+
+  // segments between gaps
+  const segs = [];
+  let prev = firstC;
+  inner.forEach(g => { segs.push({ s: prev, e: g.s - 1 }); prev = g.e + 1; });
+  segs.push({ s: prev, e: lastC });
+  const toX = (bin) => minX + bin * step;
+  segs.forEach(sg => {
+    sg.x0 = toX(sg.s); sg.x1 = toX(sg.e + 1);
+    const hit = glines.filter(l => l.words.some(w => w.cx >= sg.x0 && w.cx < sg.x1 && /[A-Za-z]{3,}/.test(w.t))).length;
+    sg.isName = hit >= Math.max(3, nLines * 0.15);
+  });
+
+  // numeric / non-name segments are glued to the column on their left
+  const groups = [];
+  let leading = [];
+  segs.forEach(sg => {
+    if (sg.isName) {
+      groups.push({ x0: sg.x0, x1: sg.x1, segs: [...leading, sg] });
+      leading = [];
+    } else if (groups.length) {
+      const g = groups[groups.length - 1];
+      g.x1 = sg.x1; g.segs.push(sg);
+    } else leading.push(sg);
+  });
+  if (!groups.length) groups.push({ x0: minX, x1: maxX, segs: [] });
+  if (leading.length && groups.length) groups[0].x0 = Math.min(groups[0].x0, leading[0].x0);
+
+  const bounds = [];
+  for (let k = 0; k < groups.length - 1; k++) bounds.push((groups[k].x1 + groups[k + 1].x0) / 2);
+
+  // lines whose words cross a column boundary are titles/banners, not menu rows
+  const titleLines = [];
+  const colLinesWords = groups.map(() => []);
+  glines.forEach(l => {
+    const crosses = bounds.some(b => l.words.some(w => w.x0 < b - 1 && w.x1 > b + 1));
+    if (crosses) {
+      titleLines.push({ cy: l.cy, text: l.words.slice().sort((a, b) => a.x0 - b.x0).map(w => w.t).join(" ") });
+      return;
+    }
+    l.words.forEach(w => {
+      let c = 0;
+      while (c < bounds.length && w.cx > bounds[c]) c++;
+      colLinesWords[c].push(w);
+    });
+  });
+  titleLines.sort((a, b) => a.cy - b.cy);
+
+  const columns = colLinesWords.map(cw => {
+    return clusterWordsIntoLines(cw, mh * 0.6).map(l => {
+      const sorted = l.words.slice().sort((a, b) => a.x0 - b.x0);
+      return { tokens: sorted.map(w => w.t), cy: l.cy, h: medianOf(sorted.map(w => w.h)) };
+    });
+  });
+
+  let titleName = "";
+  for (const tl of titleLines) {
+    const clean = tl.text.replace(/[^A-Za-z0-9&' ]/g, " ").replace(/\s+/g, " ").trim();
+    if (/[A-Za-z]{3,}/.test(clean) && clean.length <= 40 &&
+        !/(welcome|delivery|contact|free|facebook|www|subject)/i.test(clean)) { titleName = toTitleCase(clean); break; }
+  }
+  return { columns, titleLines, mh, titleName };
+}
+
+function menuLayoutToRawText(layout) {
+  const out = [];
+  layout.titleLines.forEach(t => out.push(t.text));
+  if (layout.titleLines.length) out.push("");
+  layout.columns.forEach(col => {
+    col.forEach(l => out.push(l.tokens.join(" ")));
+    out.push("");
+  });
+  return out.join("\n").trim();
+}
+
+function extractOcrWords(data) {
+  if (!data) return [];
+  if (Array.isArray(data.words) && data.words.length) return data.words;
+  const words = [];
+  (data.blocks || []).forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => (l.words || []).forEach(w => words.push(w)))));
+  return words;
+}
+
+/* ---------------- plain text (paste / TXT / PDF / re-extract) ---------------- */
+function parseMenuTextToItems(rawText) {
+  const lines = String(rawText || "").split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+
+  // CSV with a header row
+  if (lines.length >= 2 && lines[0].includes(",") && /price|cost|amount|rate/i.test(lines[0])) {
+    const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+    const nameIdx = Math.max(0, headers.findIndex(h => /name|item|dish|title/.test(h)));
+    const priceIdx = headers.findIndex(h => /price|cost|amount|rate/.test(h));
+    const catIdx = headers.findIndex(h => /cat|section|group|type/.test(h));
+    const descIdx = headers.findIndex(h => /desc|detail|note/.test(h));
+    const vegIdx = headers.findIndex(h => /veg|diet/.test(h));
+    if (priceIdx !== -1) {
+      const csvItems = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map(c => c.trim().replace(/^["']|["']$/g, ""));
+        const name = cols[nameIdx];
+        const price = parseFloat((cols[priceIdx] || "").replace(/[^\d.]/g, ""));
+        if (name && !isNaN(price)) {
+          csvItems.push({
+            id: genId(), name,
+            category: (catIdx !== -1 && cols[catIdx]) ? cols[catIdx] : "Menu",
+            price,
+            desc: (descIdx !== -1 && cols[descIdx]) ? cols[descIdx] : "",
+            veg: (vegIdx !== -1 && cols[vegIdx]) ? !/non|false|0|nv/i.test(cols[vegIdx]) : inferVegFromName(name)
+          });
+        }
+      }
+      if (csvItems.length) return { suggestedName: "", items: csvItems };
+    }
+  }
+
+  const isNoise = (line) => {
+    if (line.length < 2) return true;
+    if (/(\+91[\s-]?)?[6-9]\d{9}/.test(line)) return true;
+    if (/https?:\/\/|www\.|@|gstin|fssai|page\s*\d+|thank you|taxes extra/i.test(line)) return true;
+    return false;
+  };
+
+  // "Name 99/- | Name 20/-" on one line => side-by-side columns
+  const columns = [[]];
+  lines.forEach(raw => {
+    const line = raw.replace(/^[\*\-•▪▸►]+\s*/, "").trim();
+    if (isNoise(line)) return;
+    const segs = line.split(/\s*\|\s*|\t+/).map(x => x.trim()).filter(Boolean);
+    if (segs.length >= 2 && segs.every(sg => /[A-Za-z]{3,}/.test(sg))) {
+      segs.forEach((sg, k) => { (columns[k] = columns[k] || []).push({ tokens: sg.split(" ") }); });
+    } else {
+      columns[0].push({ tokens: line.split(" ") });
+    }
+  });
+  return parseMenuColumns(columns.filter(c => c && c.length), {});
+}
+
+function cleanItemName(str) {
+  return String(str || "")
+    .replace(/^\d{1,3}[.)]\s+(?=[A-Za-z])/, "")
+    .replace(/[\.\-–—:|•\/]+$/g, "")
+    .replace(/\[(?:V|NV|Veg|Non-Veg)\]/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toTitleCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function renderScannedItemsEditor() {
+  const list = document.getElementById("scanned-items-list");
+  const badge = document.getElementById("scanned-items-count-badge");
+  badge.textContent = `${scannerItems.length} item${scannerItems.length !== 1 ? "s" : ""}`;
+
+  if (!scannerItems.length) {
+    list.innerHTML = `
+      <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
+        Upload or scan a menu above, or click <strong>+ Add Item Row</strong> to enter items manually.
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = scannerItems.map((item, idx) => `
+    <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <button type="button" onclick="toggleScannedItemVeg(${idx})" title="Toggle Veg / Non-Veg"
+          class="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 hover:border-orange-300">
+          <span class="veg-dot ${item.veg ? "veg" : "nonveg"}"></span>
+        </button>
+        <input type="text" value="${escHtml(item.name)}" placeholder="Item name *"
+          onchange="updateScannedItemField(${idx}, 'name', this.value)"
+          class="flex-1 min-w-0 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-white" />
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="text" value="${escHtml(item.category)}" placeholder="Category"
+          onchange="updateScannedItemField(${idx}, 'category', this.value)"
+          class="w-28 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white" />
+        <div class="relative w-24">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">₹</span>
+          <input type="number" min="0" step="1" value="${item.price}" placeholder="0"
+            onchange="updateScannedItemField(${idx}, 'price', parseFloat(this.value) || 0)"
+            class="w-full border border-slate-200 rounded-lg pl-6 pr-2 py-1.5 text-xs font-bold text-orange-600 bg-white" />
+        </div>
+        <button type="button" onclick="removeScannedItemRow(${idx})" title="Delete item"
+          class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-xs font-bold flex items-center justify-center flex-shrink-0">✕</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function addEmptyScannedItemRow() {
+  const lastCat = scannerItems.length > 0 ? scannerItems[scannerItems.length - 1].category : "Menu";
+  scannerItems.push({
+    id: genId(),
+    name: "",
+    category: lastCat || "Menu",
+    price: 0,
+    desc: "",
+    veg: true
+  });
+  renderScannedItemsEditor();
+  const list = document.getElementById("scanned-items-list");
+  list.scrollTop = list.scrollHeight;
+}
+
+function updateScannedItemField(idx, field, value) {
+  if (!scannerItems[idx]) return;
+  scannerItems[idx][field] = value;
+}
+
+function toggleScannedItemVeg(idx) {
+  if (!scannerItems[idx]) return;
+  scannerItems[idx].veg = !scannerItems[idx].veg;
+  renderScannedItemsEditor();
+}
+
+function removeScannedItemRow(idx) {
+  scannerItems.splice(idx, 1);
+  renderScannedItemsEditor();
+}
+
+function saveAndSelectScannedMenu() {
+  if (!currentSpace || currentSession.role !== "host") return;
+
+  const restName = document.getElementById("scanned-rest-name").value.trim() || "Scanned Menu";
+  const restCuisine = document.getElementById("scanned-rest-cuisine").value.trim() || "Scanned Menu";
+
+  const validItems = scannerItems
+    .map(it => ({
+      id: it.id || genId(),
+      name: (it.name || "").trim(),
+      category: (it.category || "Menu").trim() || "Menu",
+      price: Math.max(0, Number(it.price) || 0),
+      desc: (it.desc || "").trim(),
+      veg: !!it.veg,
+      bestseller: false
+    }))
+    .filter(it => it.name.length > 0);
+
+  if (!validItems.length) {
+    showToast("Please add at least one menu item with a name.", "error");
+    return;
+  }
+
+  const categories = Array.from(new Set(validItems.map(i => i.category)));
+  const newRestaurant = {
+    id: "custom-menu-" + genId(),
+    name: restName,
+    cuisine: restCuisine,
+    rating: 5.0,
+    deliveryTime: "Custom Menu",
+    minOrder: 0,
+    emoji: "📋",
+    color: "#F97316",
+    isCustomMenu: true,
+    categories,
+    menu: validItems
+  };
+
+  const applyNewMenu = () => {
+    saveCustomRestaurantGlobally(newRestaurant);
+    if (!currentSpace.customRestaurants) currentSpace.customRestaurants = [];
+    currentSpace.customRestaurants.push(newRestaurant);
+    currentSpace.selectedRestaurantId = newRestaurant.id;
+    activeMenuCategory = categories[0];
+    menuItemQtyMap = {};
+    saveAndBroadcast();
+    closeMenuScannerModal();
+    renderRoom();
+    showToast(`"${restName}" loaded with ${validItems.length} items!`, "success");
+  };
+
+  const hasMenuItems = currentSpace.items.some(i => i.type === "menu");
+  if (hasMenuItems && currentSpace.selectedRestaurantId) {
+    showConfirmModal(
+      "📋",
+      "Switch to Scanned Menu?",
+      "Switching restaurants will remove current restaurant menu items from the cart. Custom items will be kept.",
+      () => {
+        currentSpace.items = currentSpace.items.filter(i => i.type !== "menu");
+        applyNewMenu();
+      }
+    );
+  } else {
+    applyNewMenu();
+  }
+}
+
+// =========================================================================
+// 10. CUSTOM ITEM
+// =========================================================================
+function toggleCustomForm() {
+  const body = document.getElementById("custom-form-body");
+  const chevron = document.getElementById("custom-form-chevron");
+  const hidden = body.classList.toggle("hidden");
+  chevron.style.transform = hidden ? "" : "rotate(180deg)";
+}
+
+function addCustomItem() {
+  const space = currentSpace;
+  if (space.lockedAt) { showToast("Cart is locked by host.", "error"); return; }
+
+  const name = document.getElementById("custom-name").value.trim();
+  const qty = parseInt(document.getElementById("custom-qty").value) || 1;
+  const price = parseFloat(document.getElementById("custom-price").value) || 0;
+  const note = document.getElementById("custom-note").value.trim();
+
+  if (!name) { showToast("Please enter an item name.", "error"); return; }
+  if (qty < 1) { showToast("Quantity must be at least 1.", "error"); return; }
+
+  const member = space.members.find(m => m.id === currentSession.memberId);
+  const cartItem = {
+    id: genId(),
+    memberId: currentSession.memberId,
+    memberName: currentSession.memberName,
+    memberColor: member ? member.color : MEMBER_COLORS[0],
+    type: "custom",
+    restaurantId: null,
+    name,
+    desc: "",
+    qty,
+    unitPrice: price,
+    note,
+    addedAt: Date.now()
+  };
+
+  space.items.push(cartItem);
+  saveAndBroadcast();
+  renderRoom();
+
+  document.getElementById("custom-name").value = "";
+  document.getElementById("custom-qty").value = "1";
+  document.getElementById("custom-price").value = "";
+  document.getElementById("custom-note").value = "";
+
+  showToast(`${name} added to cart!`, "success");
+}
+
+// =========================================================================
+// 11. CART RENDERING
+// =========================================================================
+function renderCart() {
+  const space = currentSpace;
+  const session = currentSession;
+
+  const lockedBadge = document.getElementById("cart-locked-badge");
+  lockedBadge.classList.toggle("hidden", !space.lockedAt);
+
+  const totalQty = space.items.reduce((s, i) => s + i.qty, 0);
+  document.getElementById("cart-item-count").textContent = `${totalQty} item${totalQty !== 1 ? "s" : ""}`;
+
+  renderCartMemberTabs();
+  renderCartItems();
+  renderCartTotals();
+}
+
+function renderCartMemberTabs() {
+  const space = currentSpace;
+  const container = document.getElementById("cart-member-tabs");
+  const membersWithItems = space.members.filter(m => space.items.some(i => i.memberId === m.id));
+
+  let tabs = `<button onclick="setCartFilter('all')" class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${cartFilterMemberId === "all" ? "pill-active border-orange-500" : "bg-white border-slate-200 text-slate-600 hover:border-orange-300"}">All</button>`;
+
+  tabs += membersWithItems.map(m => {
+    const active = cartFilterMemberId === m.id;
+    return `<button onclick="setCartFilter('${m.id}')"
+      class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
+      style="${active ? `background:${m.color}; color:#fff; border-color:${m.color};` : `background:${m.color}18; color:${m.color}; border-color:${m.color}44;`}">
+      ${escHtml(m.name)}
+    </button>`;
+  }).join("");
+
+  container.innerHTML = tabs;
+}
+
+function setCartFilter(memberId) {
+  cartFilterMemberId = memberId;
+  renderCart();
+}
+
+function renderCartItems() {
+  const space = currentSpace;
+  const session = currentSession;
+  const isHost = session.role === "host";
+  const container = document.getElementById("cart-items-container");
+  const allRests = getAllRestaurants(space);
+
+  let items = space.items;
+  if (cartFilterMemberId !== "all") {
+    items = items.filter(i => i.memberId === cartFilterMemberId);
+  }
+
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 text-center">
+        <div class="text-5xl mb-4">🛒</div>
+        <div class="font-semibold text-slate-600 mb-1">Cart is empty</div>
+        <div class="text-sm text-slate-400">${space.selectedRestaurantId ? "Browse the menu and add items!" : "Select a restaurant or scan a menu to start adding items."}</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(item => {
+    const canEdit = isHost || item.memberId === session.memberId;
+    const isLocked = !!space.lockedAt;
+    const restName = item.type === "menu"
+      ? (allRests.find(r => r.id === item.restaurantId)?.name || "Restaurant")
+      : "Custom";
+
+    return `
+    <div class="cart-item-row flex items-start gap-2 p-2.5 rounded-xl transition-all">
+      <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold mt-0.5"
+           style="background:${item.memberColor};">${item.memberName.charAt(0).toUpperCase()}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-800 leading-snug">${escHtml(item.name)}</div>
+            <div class="text-xs text-slate-400">${escHtml(item.memberName)} · <span class="italic">${escHtml(restName)}</span></div>
+            ${item.note ? `<div class="text-xs text-slate-400 mt-0.5">📝 ${escHtml(item.note)}</div>` : ""}
+          </div>
+          <div class="text-sm font-bold text-orange-600 flex-shrink-0">${fmt(item.qty * item.unitPrice)}</div>
+        </div>
+        ${canEdit && !isLocked ? `
+        <div class="flex items-center gap-2 mt-1.5">
+          <div class="flex items-center gap-1 border border-slate-200 rounded-lg overflow-hidden">
+            <button onclick="changeCartQty('${item.id}', -1)" class="qty-btn text-slate-500 hover:text-orange-600">−</button>
+            <span class="text-xs font-bold text-slate-700 w-6 text-center">${item.qty}</span>
+            <button onclick="changeCartQty('${item.id}', 1)" class="qty-btn text-slate-500 hover:text-orange-600">+</button>
+          </div>
+          <span class="text-xs text-slate-400">${fmt(item.unitPrice)} each</span>
+          <button onclick="removeCartItem('${item.id}')" class="ml-auto text-xs text-red-400 hover:text-red-600 font-medium">Remove</button>
+        </div>` : `
+        <div class="text-xs text-slate-400 mt-1">Qty: ${item.qty} · ${fmt(item.unitPrice)} each</div>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function changeCartQty(itemId, delta) {
+  const space = currentSpace;
+  if (space.lockedAt) { showToast("Cart is locked.", "error"); return; }
+  const item = space.items.find(i => i.id === itemId);
+  if (!item) return;
+  const canEdit = currentSession.role === "host" || item.memberId === currentSession.memberId;
+  if (!canEdit) return;
+  item.qty = Math.max(1, item.qty + delta);
+  saveAndBroadcast();
+  renderRoom();
+}
+
+function removeCartItem(itemId) {
+  const space = currentSpace;
+  if (space.lockedAt) { showToast("Cart is locked.", "error"); return; }
+  const item = space.items.find(i => i.id === itemId);
+  if (!item) return;
+  const canEdit = currentSession.role === "host" || item.memberId === currentSession.memberId;
+  if (!canEdit) return;
+  space.items = space.items.filter(i => i.id !== itemId);
+  saveAndBroadcast();
+  renderRoom();
+  showToast("Item removed.", "info");
+}
+
+function renderCartTotals() {
+  const space = currentSpace;
+  const container = document.getElementById("cart-totals");
+
+  let items = space.items;
+  if (cartFilterMemberId !== "all") {
+    items = items.filter(i => i.memberId === cartFilterMemberId);
+  }
+
+  if (!items.length) { container.innerHTML = ""; return; }
+
+  const subtotal = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+
+  let memberBreakdown = "";
+  if (cartFilterMemberId === "all") {
+    const byMember = {};
+    items.forEach(item => {
+      if (!byMember[item.memberId]) byMember[item.memberId] = { name: item.memberName, color: item.memberColor, total: 0 };
+      byMember[item.memberId].total += item.qty * item.unitPrice;
+    });
+    const entries = Object.values(byMember);
+    if (entries.length > 1) {
+      memberBreakdown = entries.map(e => `
+        <div class="flex justify-between text-xs text-slate-500">
+          <span style="color:${e.color}; font-weight:600;">${escHtml(e.name)}</span>
+          <span>${fmt(e.total)}</span>
+        </div>`).join("");
+    }
+  }
+
+  container.innerHTML = `
+    ${memberBreakdown}
+    ${memberBreakdown ? `<div class="border-t border-slate-100 pt-2 mt-2"></div>` : ""}
+    <div class="flex justify-between text-sm font-bold text-slate-800">
+      <span>Total</span>
+      <span class="text-orange-600">${fmt(subtotal)}</span>
+    </div>`;
+}
+
+// =========================================================================
+// 12. HOST CONTROLS
+// =========================================================================
+function updateHostControls() {
+  const isHost = currentSession.role === "host";
+  document.getElementById("host-controls").classList.toggle("hidden", !isHost);
+  if (isHost) {
+    const btn = document.getElementById("lock-cart-btn");
+    const isLocked = !!currentSpace.lockedAt;
+    btn.textContent = isLocked ? "🔓 Unlock Cart" : "🔒 Lock Cart";
+    btn.className = isLocked ? "btn-brand py-2.5 text-sm" : "btn-ghost py-2.5 text-sm";
+  }
+}
+
+function toggleLockCart() {
+  if (currentSession.role !== "host") return;
+  const space = currentSpace;
+  space.lockedAt = space.lockedAt ? null : Date.now();
+  saveAndBroadcast();
+  renderRoom();
+  showToast(space.lockedAt ? "Cart locked!" : "Cart unlocked!", "info");
+}
+
+function confirmClearAll() {
+  showConfirmModal(
+    "🗑️",
+    "Clear All Items?",
+    "This will permanently remove all items from the shared cart. This cannot be undone.",
+    () => {
+      currentSpace.items = [];
+      saveAndBroadcast();
+      renderRoom();
+      showToast("Cart cleared.", "info");
+    }
+  );
+}
+
+function copyOrderSummary() {
+  const space = currentSpace;
+  if (!space.items.length) { showToast("Cart is empty.", "error"); return; }
+
+  const restName = space.selectedRestaurantId
+    ? (getAllRestaurants(space).find(r => r.id === space.selectedRestaurantId)?.name || "")
+    : "";
+
+  let lines = [`🛒 ${space.name} — Order Summary`];
+  if (restName) lines.push(`🍽️ ${restName}`);
+  lines.push(`📅 ${new Date().toLocaleString()}`);
+  lines.push("");
+
+  const byMember = {};
+  space.items.forEach(item => {
+    if (!byMember[item.memberId]) byMember[item.memberId] = { name: item.memberName, items: [] };
+    byMember[item.memberId].items.push(item);
+  });
+
+  let grandTotal = 0;
+  for (const mid in byMember) {
+    const { name, items } = byMember[mid];
+    const memberTotal = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+    grandTotal += memberTotal;
+    lines.push(`👤 ${name} (${fmt(memberTotal)})`);
+    items.forEach(i => lines.push(`   • ${i.qty}x ${i.name} — ${fmt(i.qty * i.unitPrice)}`));
+    lines.push("");
+  }
+
+  lines.push(`💰 Grand Total: ${fmt(grandTotal)}`);
+
+  navigator.clipboard.writeText(lines.join("\n")).then(() => {
+    showToast("Order summary copied to clipboard!", "success");
+  }).catch(() => {
+    showToast("Could not copy. Please try manually.", "error");
+  });
+}
+
+// =========================================================================
+// 13. SAVE & BROADCAST
+// =========================================================================
+function saveAndBroadcast() {
+  if (!currentSpace) return;
+  saveSpace(currentSpace);
+  broadcastUpdate(currentSpace.code);
+}
+
+// =========================================================================
+// 14. INVITE & QR
+// =========================================================================
+function updateInviteLinks() {
+  if (!currentSpace) return;
+  const link = getInviteLink(currentSpace.code);
+  const inp = document.getElementById("invite-link-display");
+  if (inp) inp.value = link;
+  const qrInp = document.getElementById("qr-invite-link");
+  if (qrInp) qrInp.value = link;
+  const qrCode = document.getElementById("qr-space-code");
+  if (qrCode) qrCode.textContent = currentSpace.code;
+}
+
+function openQRModal() {
+  if (!currentSpace) return;
+  const link = getInviteLink(currentSpace.code);
+  document.getElementById("qr-invite-link").value = link;
+  document.getElementById("qr-space-code").textContent = currentSpace.code;
+  document.getElementById("qr-modal").classList.remove("hidden");
+  setTimeout(() => {
+    PureQR.renderToCanvas(document.getElementById("qr-canvas"), link, 240);
+  }, 50);
+}
+
+function closeQRModal(e) {
+  if (!e || e.target === document.getElementById("qr-modal")) {
+    document.getElementById("qr-modal").classList.add("hidden");
+  }
+}
+
+function copyInviteLink() {
+  if (!currentSpace) return;
+  const link = getInviteLink(currentSpace.code);
+  navigator.clipboard.writeText(link).then(() => {
+    showToast("Invite link copied!", "success");
+  }).catch(() => {
+    showToast("Copy failed.", "error");
+  });
+}
+
+function openMemberTab() {
+  if (!currentSpace) return;
+  window.open(getInviteLink(currentSpace.code), "_blank");
+}
+
+// =========================================================================
+// 15. CONFIRM MODAL
+// =========================================================================
+function showConfirmModal(icon, title, desc, onConfirm) {
+  document.getElementById("confirm-icon").textContent = icon;
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-desc").textContent = desc;
+  confirmCallback = onConfirm;
+  document.getElementById("confirm-modal").classList.remove("hidden");
+  document.getElementById("confirm-ok-btn").onclick = () => {
+    closeConfirmModal();
+    if (confirmCallback) confirmCallback();
+  };
+}
+
+function closeConfirmModal(e) {
+  if (!e || e.target === document.getElementById("confirm-modal")) {
+    document.getElementById("confirm-modal").classList.add("hidden");
+    confirmCallback = null;
+  }
+}
+
+// =========================================================================
+// 16. TOAST NOTIFICATIONS
+// =========================================================================
+function showToast(msg, type = "info") {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity .3s";
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// =========================================================================
+// 17. LEAVE ROOM
+// =========================================================================
+function leaveRoom() {
+  gcUnwatch();
+  stopMenuCamera();
+  sessionStorage.removeItem(GC_SESSION);
+  currentSpace = null;
+  currentSession = null;
+  document.getElementById("view-room").classList.add("hidden");
+  document.getElementById("view-landing").classList.remove("hidden");
+  renderRecentSpaces();
+}
+
+// =========================================================================
+// 18. ESCAPE HELPERS
+// =========================================================================
+function escHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escAttr(str) {
+  if (!str) return "";
+  return String(str).replace(/'/g, "\\'").replace(/"/g, "&quot;");
+}
+
+// =========================================================================
+// 19. INIT — URL params, session restore
+// =========================================================================
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const joinCode = params.get("join");
+  gcSetStatus(true);
+
+  const session = loadSession();
+  if (session && session.spaceCode) {
+    let space = null;
+    try { space = await fetchSpace(session.spaceCode); } catch (e) { space = loadSpace(session.spaceCode); }
+    if (space) {
+      enterRoom(space, session);
+      if (joinCode && joinCode !== session.spaceCode) {
+        leaveRoom();
+      } else {
+        return;
+      }
+    } else {
+      sessionStorage.removeItem(GC_SESSION);
+    }
+  }
+
+  renderRecentSpaces();
+
+  if (joinCode) {
+    switchLandingTab("join");
+    document.getElementById("inp-join-code").value = joinCode.toUpperCase();
+    document.getElementById("inp-join-name").focus();
+  }
+})();
+</script>
+</body>
+</html>
