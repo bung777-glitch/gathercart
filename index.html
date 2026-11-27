@@ -1081,8 +1081,14 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+const GC_PUBLIC_URL = "https://bung777-glitch.github.io/gathercart/";
+
 function getInviteLink(code) {
-  return window.location.href.split("?")[0] + "?join=" + code;
+  const h = window.location.hostname;
+  const isLocal = window.location.protocol === "file:" || h === "localhost" || h === "127.0.0.1" ||
+                  /^(192\.168\.|10\.)/.test(h);
+  const base = isLocal ? GC_PUBLIC_URL : window.location.href.split("?")[0].split("#")[0];
+  return base + "?join=" + code;
 }
 
 function fmt(price) {
